@@ -111,3 +111,26 @@ void eliminar_buffer(t_buffer* buffer) {
 void iterator(char* value) {
 	log_info(logger,"%s", value);
 }
+
+int recibir_operacion(int socket_cliente)
+{
+	int cod_op;
+	if(recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL) > 0)
+		return cod_op;
+	else
+	{
+		close(socket_cliente);
+		return -1;
+	}
+}
+
+int enviar_operacion(int socket_cliente, int cod_op) {
+    int bytes = send(socket_cliente, &cod_op, sizeof(cod_op), 0);
+    if (bytes != sizeof(cod_op)) {
+    log_error(logger,
+              "enviar_operacion: enviados %d bytes (esperados %zu)",
+              bytes, sizeof(cod_op));
+    return -1;
+}
+    return 0;
+}

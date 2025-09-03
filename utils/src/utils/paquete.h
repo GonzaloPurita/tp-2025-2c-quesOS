@@ -8,7 +8,7 @@
 #include"conexiones.h"
 
 typedef enum {
-	PAQUETE,
+	MENSAJE
 }op_code;
 
 
@@ -104,3 +104,12 @@ void eliminar_buffer(t_buffer* buffer);
 * @return No devuelve nada.
 */
 void iterator(char* value);
+
+/**
+ * @brief Recibe el código de operación desde un socket.
+ * @param socket_cliente Descriptor del socket del cliente.
+ * @return El código de operación recibido.
+ */
+int recibir_operacion(int socket_cliente);
+
+#endif /* PAQUETES_H_ */
