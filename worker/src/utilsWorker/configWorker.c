@@ -11,7 +11,7 @@ void iniciar_config(char* path) {
     configWorker->ip_master = strdup(config_get_string_value(config, "IP_MASTER"));
     configWorker->ip_storage = strdup(config_get_string_value(config, "IP_STORAGE"));
     configWorker->algoritmo_reemplazo = strdup(config_get_string_value(config, "ALGORITMO_REEMPLAZO"));
-    configWorker->path_queries = strdup(config_get_string_value(config, "PATH_QUERIES"));
+    configWorker->path_scripts = strdup(config_get_string_value(config, "PATH_SCRIPTS"));
     configWorker->log_level = strdup(config_get_string_value(config, "LOG_LEVEL"));
     configWorker->puerto_master = config_get_int_value(config, "PUERTO_MASTER");
     configWorker->puerto_storage = config_get_int_value(config, "PUERTO_STORAGE");
@@ -27,7 +27,7 @@ void liberar_config() {
     free(configWorker->ip_master);
     free(configWorker->ip_storage);
     free(configWorker->algoritmo_reemplazo);
-    free(configWorker->path_queries);
+    free(configWorker->path_scripts);
     free(configWorker->log_level);
     free(configWorker);
     log_destroy(loggerWorker);
