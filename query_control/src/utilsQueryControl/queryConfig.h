@@ -17,7 +17,7 @@ typedef struct {
 extern t_config_query_control* configQueryControl;
 extern t_log* loggerQueryControl;
 
-void iniciar_config(char* path);
+void iniciar_config(char* path, char* id);
 void liberar_config();
 
 #endif /* CONFIGURACION_QUERY_CONTROL_H_ */

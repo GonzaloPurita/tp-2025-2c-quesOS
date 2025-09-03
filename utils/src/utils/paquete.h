@@ -99,13 +99,6 @@ void crear_buffer(t_paquete* paquete);
 void eliminar_buffer(t_buffer* buffer);
 
 /**
-* @brief Iterador que opera sobre un valor de tipo cadena.
-* @param value Cadena de texto sobre la que se realizará la operación.
-* @return No devuelve nada.
-*/
-void iterator(char* value);
-
-/**
  * @brief Recibe el código de operación desde un socket.
  * @param socket_cliente Descriptor del socket del cliente.
  * @return El código de operación recibido.
