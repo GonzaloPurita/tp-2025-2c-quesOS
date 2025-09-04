@@ -1,4 +1,5 @@
 #include "query_interpreter.h"
+t_query_context* query_actual;
 
 void recibir_queries(){
 
@@ -21,11 +22,10 @@ void recibir_queries(){
             int* pc_inicial = list_get(paquete, 2);
 
             // Crear contexto global
-            QUERY_ACTUAL = malloc(sizeof(t_query_context));
-            QUERY_ACTUAL->query_id = *query_id;
-            QUERY_ACTUAL->nombre_query = strdup(nombre_query);
-            QUERY_ACTUAL->pc_inicial = *pc_inicial; 
-
+            query_actual = malloc(sizeof(t_query_context));
+            query_actual->query_id = *query_id;
+            query_actual->nombre_query = strdup(nombre_query);
+            query_actual->pc_inicial = *pc_inicial; 
             PC_ACTUAL = *pc_inicial;
 
             // Armo el path completo
@@ -33,14 +33,13 @@ void recibir_queries(){
             string_append(&path_query, configWorker->path_scripts);
             string_append(&path_query, nombre_query);
 
-            log_info(loggerWorker, "## Query %d: Se recibe la Query. El path de operaciones es: %d", QUERY_ACTUAL->query_id, path_query);
+            log_info(loggerWorker, "## Query %d: Se recibe la Query. El path de operaciones es: %d", query_actual->query_id, path_query);
 
             // ESTO SERIA COMO UN CICLO DE INSTRUCCION
             ejercutar_query(path_query);
 
             list_destroy_and_destroy_elements(paquete, free);
         }
-
     }
 }
 
@@ -62,22 +61,19 @@ void ejercutar_query(char* path_query){
             linea_actual++;
             continue;
         }
-
-        log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", QUERY_ACTUAL->query_id, PC_ACTUAL, linea);
+        log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
         // RETARDO -> siempre uno por instrucción
         usleep(configWorker->retardo_memoria * 1000);
 
 
     // DECODE
-
         t_instruccion* inst = decode(linea);
         execute(inst);
         destruir_instruccion(inst);
 
         PC_ACTUAL++;
         linea_actual++;
-
     }
 
     free(linea);
@@ -108,56 +104,221 @@ t_instruccion* decode(char* instruccion_raw) {
 
 // Mapea string -> opcode
 t_opcode obtener_opcode(char* nombre) {
-    if (strcmp(nombre, "CREATE") == 0) return OP_CREATE;
-    if (strcmp(nombre, "TRUNCATE") == 0) return OP_TRUNCATE;
-    if (strcmp(nombre, "WRITE") == 0) return OP_WRITE;
-    if (strcmp(nombre, "READ") == 0) return OP_READ;
-    if (strcmp(nombre, "FLUSH") == 0) return OP_FLUSH;
-    if (strcmp(nombre, "COMMIT") == 0) return OP_COMMIT;
-    if (strcmp(nombre, "DELETE") == 0) return OP_DELETE;
-    if (strcmp(nombre, "TAG") == 0) return OP_TAG;
-    if (strcmp(nombre, "END") == 0) return OP_END;
-    return OP_UNKNOWN;
+    if (strcmp(nombre, "CREATE") == 0) return CREATE;
+    if (strcmp(nombre, "TRUNCATE") == 0) return TRUNCATE;
+    if (strcmp(nombre, "WRITE") == 0) return WRITE;
+    if (strcmp(nombre, "READ") == 0) return READ;
+    if (strcmp(nombre, "FLUSH") == 0) return FLUSH;
+    if (strcmp(nombre, "COMMIT") == 0) return COMMIT;
+    if (strcmp(nombre, "DELETE") == 0) return DELETE;
+    if (strcmp(nombre, "TAG") == 0) return TAG;
+    if (strcmp(nombre, "END") == 0) return END;
+    return UNKNOWN;
 }
 
-//TODO EXECUTE
 // ejecuta según el opcode 
 void execute(t_instruccion* inst) {
     switch (inst->opcode) {
-        case OP_CREATE:
-            printf("Ejecutando CREATE sobre %s\n", inst->parametros[0]);
-            // mandar paquete a storage
+        case CREATE:
+            ejecutar_create(inst);
             break;
-
-        case OP_TRUNCATE:
-            printf("Ejecutando TRUNCATE %s a tamaño %s\n",
-                   inst->parametros[0], inst->parametros[1]);
+        case TRUNCATE:
+            ejecutar_truncate(inst);
             break;
-
-        case OP_WRITE:
-            printf("Ejecutando WRITE en %s offset %s valor %s\n",
-                   inst->parametros[0], inst->parametros[1], inst->parametros[2]);
+        case WRITE:
+            ejecutar_write(inst);
             break;
-
-        case OP_FLUSH:
-            printf("Ejecutando FLUSH sobre %s\n", inst->parametros[0]);
+        case READ:
+            ejecutar_read(inst);
             break;
-
-        case OP_END:
-            printf("Ejecutando END\n");
+        case TAG:
+            ejecutar_tag(inst);
             break;
-
+        case COMMIT:
+            ejecutar_commit(inst);
+            break;
+        case FLUSH:
+            ejecutar_flush(inst);
+            break;
+        case DELETE:
+            ejecutar_delete(nst);
+            break;
+        case END:
+            ejecutar_end(inst);
+            break;
         default:
-            printf("Instrucción desconocida\n");
+            log_info(loggerWorker, "Instrucción desconocida");
             break;
     }
 }
 
-// Liberar memoria
+//mapea <NOMBRE_FILE>:<TAG> a t_formato
+t_formato* mapear_formato(char* recurso){
+
+    // separo en base al ":"
+    char** partes = string_split(recurso, ":");
+    if (partes == NULL || partes[0] == NULL || partes[1] == NULL) {
+        log_error(loggerWorker, "parametros invalidos");
+        string_array_destroy(partes);
+        return NULL; // formato inválido
+    }
+
+    // armo la estructura
+    t_formato* formato = malloc(sizeof(t_formato));
+    formato->file_name = strdup(partes[0]); // "MATERIAS"
+    formato->tag = strdup(partes[1]); // "BASE"
+
+    string_array_destroy(partes);
+    return formato;
+}
+
+void destruir_formato(t_formato* formato) {
+    if (formato == NULL) return;
+    free(formato->file_name);
+    free(formato->tag);
+    free(formato);
+}
+
+// --- INSTRUCCIONES --- //
+
+void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREATE MATERIAS:BASE
+    char* recurso = inst->parametros[0]; //MATERIAS:BASE
+   
+    // Mapear <NOMBRE_FILE>:<TAG> → t_formato
+    t_formato* formato = mapear_formato(recurso);
+
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_CREATE;
+    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+
+    log_info(loggerWorker,  "## Query %d: - Instrucción realizada: CREATE %s", query_actual->query_id, recurso);
+
+    destruir_formato(formato);
+}
+
+void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TAMAÑO> ej TRUNCATE MATERIAS:BASE 1024
+    char* recurso = inst->parametros[0];
+    char* tamanio = inst->parametros[1]; // "1024"
+    
+    // Mapear <NOMBRE_FILE>:<TAG> → t_formato
+    t_formato* formato = mapear_formato(recurso);
+
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_TRUNCATE;
+    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+    agregar_a_paquete(paquete, tamanio, strlen(tamanio) + 1);
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+
+    log_info(loggerWorker,  "## Query %d: - Instrucción realizada: CREATE %d %s", query_actual->query_id, recurso);
+
+    destruir_formato(formato);
+}
+
+void ejecutar_tag(t_instruccion* inst){ //  WRITE <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <CONTENIDO>
+    char* recurso = inst->parametros[0];            
+
+    t_formato* formato = mapear_formato(recurso);
+    char* valor = inst->parametros[1];
+
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_TAG;
+    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+    agregar_a_paquete(paquete, valor, strlen(valor) + 1);
+
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", QUERY_ACTUAL->query_id, recurso, valor);
+
+    destruir_formato(formato);
+}
+
+void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
+    char* recurso = inst->parametros[0];
+    t_formato* formato = mapear_formato(recurso);
+
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_DELETE;
+    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
+
+    destruir_formato(formato);
+}
+
+void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COMMIT MATERIAS:BASE
+    char* recurso = inst->parametros[0];
+
+    t_formato* formato = mapear_formato(recurso);
+
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_COMMIT;
+    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
+
+    destruir_formato(formato);
+}
+
+void ejecutar_end(t_instruccion* inst){ 
+
+    log_info(loggerWorker, "## Query %d: Instrucción realizada: END", query_actual->query_id);
+
+    // aviso al master que la Query terminó
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_END;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
+    enviar_paquete(paquete, conexionMaster);
+    eliminar_paquete(paquete);
+
+    // libero contexto
+    destruir_query_context(query_actual);
+}
+
+void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>
+    char* recurso = inst->parametros[0];           // ej: READ MATERIAS:BASE 0 8
+    //TODO
+}
+
+void ejecutar_write(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
+    char* recurso = inst->parametros[0];            //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
+    //TODO
+}
+
+void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
+    char* recurso = inst->parametros[0];
+    //TODO
+}
+
+
+// --- Para liberar memoria --- //
+
+
 void destruir_instruccion(t_instruccion* inst) {
     for (int i = 0; i < inst->num_parametros; i++) {
         free(inst->parametros[i]);
     }
     free(inst->parametros);
     free(inst);
+}
+
+void destruir_query_context(t_query_context* ctx) {
+    if (ctx == NULL) return;
+
+    free(ctx->nombre_query);  // strdup en la creación
+    free(ctx);
 }

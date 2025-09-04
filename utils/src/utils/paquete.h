@@ -5,7 +5,7 @@
 #include<stdlib.h>
 #include<string.h>
 #include<commons/collections/list.h>
-#include"conexiones.h"
+#include "conexiones.h"
 
 typedef enum {
 	MENSAJE,
@@ -13,8 +13,14 @@ typedef enum {
 	// WORKER <---> MASTER
 	ID_WORKER,
 	NUEVA_QUERY,
+	OP_END,
 	// WORKER <---> STORAGE
-	TAMANIO_BLOQUE
+	TAMANIO_BLOQUE,
+	OP_CREATE,
+	OP_TRUNCATE,
+	OP_DELETE,
+	OP_TAG,
+	OP_COMMIT
 }op_code;
 
 

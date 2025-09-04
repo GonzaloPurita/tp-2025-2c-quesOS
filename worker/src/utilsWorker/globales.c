@@ -12,8 +12,6 @@ void* MEMORIA;
 
 int TAM_BLOQUE;
 int PC_ACTUAL; //inicializo en 0
-t_query_context* QUERY_ACTUAL;
- 
 
 void iniciar_memoria(){
     TAM_PAGINA = TAM_BLOQUE;                // viene de Storage
