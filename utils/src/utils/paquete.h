@@ -12,6 +12,7 @@ typedef enum {
 
 	// WORKER <---> MASTER
 	ID_WORKER,
+	NUEVA_QUERY,
 	// WORKER <---> STORAGE
 	TAMANIO_BLOQUE
 }op_code;

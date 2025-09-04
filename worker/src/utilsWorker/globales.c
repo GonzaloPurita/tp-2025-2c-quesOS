@@ -5,12 +5,15 @@ int conexionMaster;
 int conexionStorage;
 
 // Datos globales
-int TAM_PAGINA = 0;
-int TAM_MEMORIA = 0;
-int CANTIDAD_MARCOS = 0;
-void* MEMORIA = NULL;
+int TAM_PAGINA;
+int TAM_MEMORIA;
+int CANTIDAD_MARCOS;
+void* MEMORIA;
 
 int TAM_BLOQUE;
+int PC_ACTUAL; //inicializo en 0
+t_query_context* QUERY_ACTUAL;
+ 
 
 void iniciar_memoria(){
     TAM_PAGINA = TAM_BLOQUE;                // viene de Storage
