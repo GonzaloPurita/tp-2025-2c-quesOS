@@ -8,7 +8,12 @@
 #include"conexiones.h"
 
 typedef enum {
-	MENSAJE
+	MENSAJE,
+
+	// WORKER <---> MASTER
+	ID_WORKER,
+	// WORKER <---> STORAGE
+	TAMANIO_BLOQUE
 }op_code;
 
 
