@@ -219,24 +219,27 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     destruir_formato(formato);
 }
 
-void ejecutar_tag(t_instruccion* inst){ //  WRITE <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <CONTENIDO>
-    char* recurso = inst->parametros[0];            
+void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE_DEST>:<TAG_DESTINO>
+    char* recurso_origen = inst->parametros[0];            
+    char* recurso_destino = inst->parametros[1];
 
-    t_formato* formato = mapear_formato(recurso);
-    char* valor = inst->parametros[1];
+    t_formato* formato_origen = mapear_formato(recurso_origen);
+    t_formato* formato_destino = mapear_formato(recurso_destino);
 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_TAG;
-    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
-    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
-    agregar_a_paquete(paquete, valor, strlen(valor) + 1);
+    agregar_a_paquete(paquete, formato_origen->file_name, strlen(formato_origen->file_name) + 1);
+    agregar_a_paquete(paquete, formato_origen->tag, strlen(formato_origen->tag) + 1);
+    agregar_a_paquete(paquete, formato_destino->file_name, strlen(formato_destino->file_name) + 1);
+    agregar_a_paquete(paquete, formato_destino->tag, strlen(formato_destino->tag) + 1);
 
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", QUERY_ACTUAL->query_id, recurso, valor);
 
-    destruir_formato(formato);
+    destruir_formato(formato_origen);
+    destruir_formato(formato_destino);
 }
 
 void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
