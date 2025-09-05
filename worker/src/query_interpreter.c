@@ -289,14 +289,84 @@ void ejecutar_end(t_instruccion* inst){
     destruir_query_context(query_actual);
 }
 
-void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>
-    char* recurso = inst->parametros[0];           // ej: READ MATERIAS:BASE 0 8
-    //TODO
+
+void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>  ej: READ MATERIAS:BASE 0 8
+    char* recurso = inst->parametros[0];           
+    int direccion_base = atoi(inst->parametros[1]);
+    int tamanio = atoi(inst->parametros[2]);
+
+    t_formato* formato = mapear_formato(recurso);
+
+    //Consigna: La instrucción READ leerá de la Memoria Interna los bytes correspondientes a partir de la dirección 
+    //base del File y Tag pasados por parámetro, y deberá enviar dicha información al módulo Master. 
+    
+    t_list* paginas = paginas_necesarias(direccion_base, tamanio); //TODO calcular las paginas necesarias para leer el contenido
+
+    for (int i = 0; i < list_size(paginas); i++) { // para cada página, verifica si está en memoria; si no, pedirla
+        int* nro_pagina = list_get(paginas, i);
+        bool en_memoria = esta_en_memoria(nro_pagina); //TODO consultar si la pagina esta en la memoria
+
+        if (!en_memoria) {
+            pedir_pagina_a_storage(formato, *nro_pagina); //TODO: abajo plantee la funcion pero hay que revisarla
+        }
+    }
+
+    char* contenido = leer_desde_memoria(formato, direccion_base, tamanio); //TODO
+
+    // enviar el resultado al Master
+    t_paquete* respuesta = crear_paquete();
+    respuesta->codigo_operacion = OP_READ;
+    agregar_a_paquete(respuesta, contenido, strlen(contenido) + 1);
+
+    enviar_paquete(respuesta, conexionMaster);
+    eliminar_paquete(respuesta);
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: READ %s dir_base=%d tam=%d", query_actual->query_id, recurso, direccion_base, tamanio);
+    
+    free(contenido);
+    list_destroy_and_destroy_elements(paginas, free);
+    destruir_formato(formato);
 }
 
-void ejecutar_write(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
-    char* recurso = inst->parametros[0];            //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
-    //TODO
+void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
+    char* recurso = inst->parametros[0];           
+    
+    t_formato* formato = mapear_formato(inst);
+    int direccion_base = atoi(inst->parametros[1]);
+    char* valor  = inst->parametros[2];
+    int tamanio_valor = strlen(valor); //lo que ocupa el string
+
+    // calculo las paginas necesarias
+    t_list* paginas = paginas_necesarias(direccion_base, tamanio);
+
+    // para cada página, verifica si está en memoria; si no, pedirla
+    for (int i = 0; i < list_size(paginas); i++) { 
+        int* nro_pagina = list_get(paginas, i);
+        bool en_memoria = esta_en_memoria(nro_pagina); //TODO consultar si la pagina esta en la memoria
+
+        if (!en_memoria) {
+            pedir_pagina_a_storage(formato, *nro_pagina); //TODO: abajo plantee la funcion pero hay que revisarla
+        }
+    }
+
+    // escribir valor en memoria
+    escribir_en_memoria(formato, direccion_base, valor);
+
+    // marcar página como dirty 
+    // TODO: implementar en tabla de páginas real
+    log_debug(loggerWorker, "Página marcada como dirty para %s:%s en base %d", formato->file_name, formato->tag, direccion_base);
+
+    // informo al Master que se hizo el WRITE
+    t_paquete* respuesta = crear_paquete();
+    respuesta->codigo_operacion = OP_WRITE;
+    agregar_a_paquete(respuesta, valor, strlen(valor) + 1);
+    enviar_paquete(respuesta, conexionMaster);
+    eliminar_paquete(respuesta);
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: WRITE %s:%s base=%d valor=%s", query_actual->query_id, formato->file_name, formato->tag, direccion_base, valor);
+
+    list_destroy_and_destroy_elements(paginas, free);
+    destruir_formato(formato);
 }
 
 void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
@@ -304,6 +374,32 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
     //TODO
 }
 
+void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
+    int base_pagina = nro_pagina * TAM_PAGINA;
+
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = PED_PAG;
+    agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+    agregar_a_paquete(paquete, &base_pagina, sizeof(int));
+    
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+
+    // recibo la pagina
+
+    op_code cod_op = recibir_operacion(conexionStorage);
+    if (cod_op == PED_PAG) {
+        t_list* lista = recibir_paquete(conexionStorage);
+        char* contenido = list_get(lista, 0);
+
+        escribir_en_memoria(formato, base_pagina, contenido); // TODO: guardar 'contenido' en MEMORIA en el marco asignado a la página nro_pagina, void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor)
+        
+        log_debug(loggerWorker, "Contenido de página %d recibido desde Storage: %s", nro_pagina, contenido);
+
+        list_destroy_and_destroy_elements(lista, free);
+    }
+}
 
 // --- Para liberar memoria --- //
 

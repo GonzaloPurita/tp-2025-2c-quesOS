@@ -57,5 +57,6 @@ void ejecutar_flush(t_instruccion* inst);
 void ejecutar_delete(t_instruccion* inst);
 void ejecutar_end(t_instruccion* inst);
 
+void pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
 
 #ifndef /* QUERY_INTERPRETER_H_ */
