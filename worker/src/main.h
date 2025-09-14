@@ -8,4 +8,4 @@
 
 #endif /* MAIN_H_ */
 
-int enviar_identificador_a_kernel(char* id);
+int enviar_identificador_a_master(char* id);

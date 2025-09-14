@@ -30,9 +30,9 @@ typedef struct{ // MATERIAS:BASE
 } t_formato;
 
  typedef struct {
-    int query_id;      
+    int query_id;
     char* nombre_query;
-    int pc_inicial;         
+    int pc_inicial;    
 } t_query_context;
 
 

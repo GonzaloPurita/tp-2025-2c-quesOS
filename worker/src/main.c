@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     free(puertoMaster);
 
     //enviar ID a Master
-    enviar_id_a_master(id);
+    enviar_identificador_a_master(id);
 
     liberar_config();
     close(conexionStorage);

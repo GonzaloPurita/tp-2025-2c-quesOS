@@ -57,22 +57,19 @@ void ejercutar_query(char* path_query){
 
     // FETCH
     while(getline(&linea, &len, file) != -1){
-        if(linea_actual < PC_ACTUAL){
-            linea_actual++;
-            continue;
+        // Solo ejecutamos si ya llegamos al PC_ACTUAL
+        if (linea_actual >= PC_ACTUAL) {
+            log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
+
+            // Simula retardo de memoria
+            usleep(configWorker->retardo_memoria * 1000);
+
+            t_instruccion* inst = decode(linea);
+            execute(inst);
+            destruir_instruccion(inst);
+
+            PC_ACTUAL++;
         }
-        log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
-
-        // RETARDO -> siempre uno por instrucción
-        usleep(configWorker->retardo_memoria * 1000);
-
-
-    // DECODE
-        t_instruccion* inst = decode(linea);
-        execute(inst);
-        destruir_instruccion(inst);
-
-        PC_ACTUAL++;
         linea_actual++;
     }
 
@@ -181,6 +178,7 @@ void destruir_formato(t_formato* formato) {
 
 // --- INSTRUCCIONES --- //
 
+// le pide al storage que cree un archivo con un tag vacio
 void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREATE MATERIAS:BASE
     char* recurso = inst->parametros[0]; //MATERIAS:BASE
    
