@@ -37,8 +37,15 @@ void recibir_queries(){
 
             // ESTO SERIA COMO UN CICLO DE INSTRUCCION
             ejercutar_query(path_query);
-
+            
             list_destroy_and_destroy_elements(paquete, free);
+
+            if (interrupcion) {
+                guardar_paginas_modificadas(); // TODO: implementar
+                notificar_master_desalojo(PC_ACTUAL);
+                interrupcion = false;
+                break;
+            }
         }
     }
 }
@@ -46,9 +53,9 @@ void recibir_queries(){
 void ejercutar_query(char* path_query){
     FILE* file = fopen(path_query, "r");
     if(file == NULL){
-        log_error(loggerWorker, "No se pudo abrir el archivo: %d", path_query);
+        log_error(loggerWorker, "No se pudo abrir el archivo: %s", path_query);
         free(path_query);
-        return NULL;
+        exit(1);
     }
 
     char* linea = NULL;
@@ -234,7 +241,7 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", QUERY_ACTUAL->query_id, recurso, valor);
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
 
     destruir_formato(formato_origen);
     destruir_formato(formato_destino);

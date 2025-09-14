@@ -4,6 +4,7 @@
 #include "main.h"
 #include "globales.h"
 #include "paquete.h"
+#include "pedidos.h"
 
 typedef enum {
     CREATE,

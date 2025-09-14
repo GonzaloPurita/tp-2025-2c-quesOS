@@ -6,6 +6,10 @@
 #include <utilsWorker/configWorker.h>
 #include "pedidos.h"
 
-#endif /* MAIN_H_ */
+pthread_t hilo_listener;
+
+atomic_bool interrupcion;
 
 int enviar_identificador_a_master(char* id);
+
+#endif /* MAIN_H_ */

@@ -1,5 +1,7 @@
 #include "./main.h"
 
+interrupcion = false;
+
 int main(int argc, char* argv[]) { 
     iniciar_config(argv[1]);
     int id = atoi(argv[2]);
@@ -20,8 +22,24 @@ int main(int argc, char* argv[]) {
     //enviar ID a Master
     enviar_identificador_a_master(id);
 
+    pthread_create(&hilo_listener, NULL, listener_interrupciones, NULL); // hilo que escucha interrupciones del Master
+
+    recibir_queries();
+
+    pthread_join(hilo_listener, NULL);
     liberar_config();
     close(conexionStorage);
     close(conexionMaster);
     return 0;
+}
+
+void* listener_master(void* arg) {
+    while (1) {
+        int op = recibir_operacion(conexionMaster);
+        if (op == DESALOJO) {
+            log_debug(loggerWorker, "Master pidió desalojo");
+            interrupcion = true;
+        }
+    }
+    return NULL;
 }

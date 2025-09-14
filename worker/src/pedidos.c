@@ -33,7 +33,7 @@ int enviar_identificador_a_master(char* id) {
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = ID_WORKER;
 
-    agregar_a_paquete(paquete, id_cpu, sizeof(int));
+    agregar_a_paquete(paquete, id, sizeof(int));
     enviar_paquete(paquete, conexionMaster);
     eliminar_paquete(paquete);
 
@@ -43,3 +43,14 @@ int enviar_identificador_a_master(char* id) {
 	return result;
 }
 
+void notificar_master_desalojo(int pc) {
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = RTA_DESALOJO;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
+    agregar_a_paquete(paquete, &pc, sizeof(int));
+
+    enviar_paquete(paquete, conexionMaster);
+    eliminar_paquete(paquete);
+
+    log_info(loggerWorker, "## Query %d: Desalojada en PC=%d por pedido del Master", query_actual->query_id, pc);
+}
