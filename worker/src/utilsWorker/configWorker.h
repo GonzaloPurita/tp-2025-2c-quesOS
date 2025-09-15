@@ -18,7 +18,6 @@ typedef struct t_config_worker {
 
 // Config del Kernel Global
 extern t_config_worker* configWorker;
-extern t_log* loggerWorker;
 
 void iniciar_config(char* path);
 void liberar_config();

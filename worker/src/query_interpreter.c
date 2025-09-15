@@ -314,7 +314,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
 
     for (int i = 0; i < list_size(paginas); i++) { // para cada página, verifica si está en memoria; si no, pedirla
         int* nro_pagina = list_get(paginas, i);
-        bool en_memoria = esta_en_memoria(formato, nro_pagina);
+        bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
             pedir_pagina_a_storage(formato, *nro_pagina); //TODO: abajo plantee la funcion pero hay que revisarla
@@ -352,7 +352,7 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
     // para cada página, verifica si está en memoria; si no, pedirla
     for (int i = 0; i < list_size(paginas); i++) { 
         int* nro_pagina = list_get(paginas, i);
-        bool en_memoria = esta_en_memoria(formato, nro_pagina);
+        bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
             pedir_pagina_a_storage(formato, *nro_pagina); //TODO: abajo plantee la funcion pero hay que revisarla

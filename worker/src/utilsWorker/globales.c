@@ -8,7 +8,7 @@ int conexionStorage;
 t_log* loggerWorker;
 t_config_worker* configWorker;
 
-atomic_bool interrupcion;
+atomic_bool interrupcion = false;
 
 // Datos globales
 int TAM_PAGINA;

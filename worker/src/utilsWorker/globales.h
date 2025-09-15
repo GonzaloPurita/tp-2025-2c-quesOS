@@ -4,11 +4,13 @@
 #include <commons/collections/dictionary.h>
 #include <stdlib.h>
 #include <stdatomic.h>
+#include <commons/log.h>
 
 // tengo que poner este para no poner el include y tener dependencia circular
 typedef struct frame frame;
 typedef struct tabla_pag tabla_pag;
 typedef struct t_config_worker t_config_worker;
+typedef struct t_query_context t_query_context;
 
 // Conexiones globales
 extern int conexionMaster;
@@ -16,8 +18,8 @@ extern int conexionStorage;
 
 extern t_log* loggerWorker;
 extern t_config_worker* configWorker;
-
 extern atomic_bool interrupcion;
+extern t_query_context* query_actual;
 
 // Memoria
 extern int TAM_PAGINA;       // lo manda Storage
@@ -37,6 +39,5 @@ extern t_dictionary* diccionario_tablas; // clave = "file:tag", valor = tabla_pa
 // Funciones
 
 void iniciar_memoria();
-
 
 #endif

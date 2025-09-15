@@ -1,6 +1,6 @@
 #include "pedidos.h"
-#include <utils/paquete.h>
-#include <commons/collections/list.h>
+#include <utilsWorker/globales.h>
+#include "query_interpreter.h"
     
 void pedir_tamanio_de_bloque(){
     // Le pido el tam de bloque al storage mediante un handshake
@@ -44,8 +44,8 @@ int enviar_identificador_a_master(char* id) {
         log_error(loggerWorker, "Error: esperaba ID_WORKER y llegó %d", cod_op);
         return -1;
     }
-    t_list* paquete = recibir_paquete(conexionMaster);
-    int result = list_get(paquete, 0);
+    t_list* lista_paquete = recibir_paquete(conexionMaster);
+    int result = *(int*) list_get(lista_paquete, 0);
 
 	return result;
 }

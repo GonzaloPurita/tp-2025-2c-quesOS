@@ -1,10 +1,8 @@
 #include "./main.h"
 
-interrupcion = false;
-
 int main(int argc, char* argv[]) { 
     iniciar_config(argv[1]);
-    int id = atoi(argv[2]);
+    char* id = argv[2];
 
     // --- Conexión a Storage ---
     char* puertoStorage = string_itoa(configWorker->puerto_storage);
@@ -22,7 +20,7 @@ int main(int argc, char* argv[]) {
     //enviar ID a Master
     enviar_identificador_a_master(id);
 
-    pthread_create(&hilo_listener, NULL, listener_interrupciones, NULL); // hilo que escucha interrupciones del Master
+    pthread_create(&hilo_listener, NULL, listener_master, NULL); // hilo que escucha interrupciones del Master
 
     recibir_queries();
 
@@ -33,7 +31,7 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void* listener_master(void* arg) {
+void* listener_master() {
     while (1) {
         int op = recibir_operacion(conexionMaster);
         if (op == DESALOJO) {

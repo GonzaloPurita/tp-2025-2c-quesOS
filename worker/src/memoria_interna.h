@@ -1,9 +1,9 @@
 #ifndef MEM_INT_H_
 #define MEM_INT_H_
 
-#include <stdbool.h>
-#include <commons/collections/dictionary.h>
-#include <commons/collections/list.h>
+#include "memoria_interna.h"
+#include <utilsWorker/api_memoria.h>
+#include <utilsWorker/globales.h>
 #include <commons/string.h>
 
 // tengo que poner este para no poner el include y tener dependencia circular
@@ -32,12 +32,7 @@ typedef struct {
     t_dictionary* paginas; // clave = nro_pagina (string), valor = entrada_pag*
 } tabla_pag;
 
-t_list* paginas_necesarias(int direccion_base, int tamanio);
-bool esta_en_memoria(t_formato* formato, int nro_pagina);
-char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio);
-void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor);
 int obtener_marco_libre_o_victima();
 int elegir_victima();
-void pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
 
 #endif 

@@ -1,15 +1,12 @@
 #ifndef QUERY_INTERPRETER_H_
 #define QUERY_INTERPRETER_H_
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
+#include "query_interpreter.h"
+#include "utilsWorker/api_memoria.h"
+#include "utilsWorker/configWorker.h"
+#include "utilsWorker/globales.h"
 #include <commons/string.h>
-#include <commons/collections/list.h>
-#include <commons/log.h>
-#include <utilsWorker/globales.h>
+#include <unistd.h>
 #include <utils/paquete.h>
 
 typedef enum {
@@ -31,12 +28,12 @@ typedef struct {
     int num_parametros;
 } t_instruccion;
 
-typedef struct{ // MATERIAS:BASE
-    char* file_name; //ej: "MATERIAS"
-    char* tag; //ej "BASE"
-} t_formato;
+// typedef struct{ // MATERIAS:BASE
+//     char* file_name; //ej: "MATERIAS"
+//     char* tag; //ej "BASE"
+// } t_formato;
 
- typedef struct {
+ typedef struct t_query_context {
     int query_id;
     char* nombre_query;
     int pc_inicial;    
