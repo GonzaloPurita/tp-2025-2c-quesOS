@@ -1,10 +1,14 @@
 #ifndef GLOBALES_H_
 #define GLOBALES_H_
 
-#include "../memoria_interna.h"
 #include <commons/collections/dictionary.h>
-#include "configWorker.h"
+#include <stdlib.h>
 #include <stdatomic.h>
+
+// tengo que poner este para no poner el include y tener dependencia circular
+typedef struct frame frame;
+typedef struct tabla_pag tabla_pag;
+typedef struct t_config_worker t_config_worker;
 
 // Conexiones globales
 extern int conexionMaster;

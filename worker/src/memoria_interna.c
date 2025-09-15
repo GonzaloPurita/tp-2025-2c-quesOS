@@ -1,4 +1,9 @@
-include "memoria_interna.h"
+#include "memoria_interna.h"
+#include "query_interpreter.h"
+#include "utilsWorker/globales.h"
+#include <commons/string.h>
+#include <stdlib.h>
+#include <string.h>
 
 t_list* paginas_necesarias(int direccion_base, int tamanio) {
     t_list* paginas = list_create();

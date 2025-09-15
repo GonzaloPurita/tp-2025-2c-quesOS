@@ -7,10 +7,10 @@
 #include <utilsWorker/globales.h>
 #include <stdatomic.h>
 #include <stdlib.h>
-#include <string.h>
 #include <commons/config.h>
 #include <commons/log.h>
 #include <utils/paquete.h>
+#include <commons/string.h>
 
 pthread_t hilo_listener;
 

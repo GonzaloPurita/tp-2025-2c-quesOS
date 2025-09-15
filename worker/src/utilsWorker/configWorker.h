@@ -1,9 +1,10 @@
 #ifndef CONFIGURACION_WORKER_H_
 #define CONFIGURACION_WORKER_H_
 
-#include "../main.h"
+#include <commons/log.h>
+#include <stdlib.h>
 
-typedef struct {
+typedef struct t_config_worker {
     char* ip_master; // IP_MASTER = 127.0.0.1
     char* ip_storage; // IP_STORAGE = 127.0.0.1
     char* algoritmo_reemplazo; // ALGORITMO_REEMPLAZO = LRU o CLOCK-M
@@ -22,4 +23,4 @@ extern t_log* loggerWorker;
 void iniciar_config(char* path);
 void liberar_config();
 
-#endif /* CONFIGURACION_MASTER */
+#endif

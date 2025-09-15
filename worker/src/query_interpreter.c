@@ -1,4 +1,6 @@
 #include "query_interpreter.h"
+#include <utilsWorker/configWorker.h>
+
 t_query_context* query_actual;
 
 void recibir_queries(){

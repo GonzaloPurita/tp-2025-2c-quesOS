@@ -1,4 +1,5 @@
 #include "globales.h"
+#include "configWorker.h"
 
 // Conexiones globales
 int conexionMaster;
@@ -34,7 +35,7 @@ void iniciar_memoria(){
         exit(1);
     }
 
-    frames = calloc(CANTIDAD_MARCOS, sizeof(frame_t));
+    frames = calloc(CANTIDAD_MARCOS, sizeof(frame));
 
     log_debug(loggerWorker, "Memoria interna inicializada. TAM_MEMORIA=%d, TAM_PAGINA=%d, MARCOS=%d", TAM_MEMORIA, TAM_PAGINA, CANTIDAD_MARCOS);
 }

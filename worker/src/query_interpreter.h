@@ -42,6 +42,7 @@ typedef struct{ // MATERIAS:BASE
     int pc_inicial;    
 } t_query_context;
 
+extern t_query_context* query_actual;
 
 void recibir_queries();
 void ejercutar_query(char* path_query);
@@ -51,7 +52,7 @@ void execute(t_instruccion* inst);
 void destruir_instruccion(t_instruccion* inst);
 t_formato* mapear_formato(char* recurso);
 void destruir_formato(t_formato* formato);
-
+void destruir_query_context(t_query_context* ctx);
 
 //ejecutar instrucciones
 void ejecutar_create(t_instruccion* inst);

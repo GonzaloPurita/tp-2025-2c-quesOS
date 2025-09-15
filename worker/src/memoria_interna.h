@@ -1,8 +1,13 @@
 #ifndef MEM_INT_H_
 #define MEM_INT_H_
 
+#include <stdbool.h>
 #include <commons/collections/dictionary.h>
-#include "query_interpreter.h"
+#include <commons/collections/list.h>
+#include <commons/string.h>
+
+// tengo que poner este para no poner el include y tener dependencia circular
+typedef struct t_formato t_formato;
 
 typedef struct {
     bool ocupado; // indica si está asignado a una pagina

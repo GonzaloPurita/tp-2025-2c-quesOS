@@ -1,4 +1,6 @@
 #include "pedidos.h"
+#include <utils/paquete.h>
+#include <commons/collections/list.h>
     
 void pedir_tamanio_de_bloque(){
     // Le pido el tam de bloque al storage mediante un handshake
@@ -19,7 +21,7 @@ void pedir_tamanio_de_bloque(){
     t_list* lista = recibir_paquete(conexionStorage);
         
     if (list_size(lista) < 1) {
-        log_error(logger, "Error al recibir el tamanio de bloque");
+        log_error(loggerWorker, "Error al recibir el tamanio de bloque");
         list_destroy(lista);
         return;
     }
