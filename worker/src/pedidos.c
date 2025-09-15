@@ -37,8 +37,13 @@ int enviar_identificador_a_master(char* id) {
     enviar_paquete(paquete, conexionMaster);
     eliminar_paquete(paquete);
 
-	int result;
-	recv(conexionMaster, &result, sizeof(int), MSG_WAITALL);
+    int cod_op = recibir_operacion(conexionMaster);
+    if(cod_op != RTA_ID_WORKER) {
+        log_error(loggerWorker, "Error: esperaba ID_WORKER y llegó %d", cod_op);
+        return -1;
+    }
+    t_list* paquete = recibir_paquete(conexionMaster);
+    int result = list_get(paquete, 0);
 
 	return result;
 }
