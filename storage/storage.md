@@ -311,7 +311,46 @@ Es la que modifica el tamaño del archivo. Recibe:
 
 #### `stat`
 
+La función `stat` devuelve información sobre la entrada de directorio. Lo vamos a usar principalmente para saber cuantos bloques lógicos referencian a un bloque físico.
 
+Principales funciones:
+
+```c
+// stat es un struct con bastante información lo más relevante es
+
+typedef struct {
+   nlink_t st_nlink; // Es el número de hardlinks
+   off_t st_size; // Tamaño total en bytes
+} stat;
+
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int contarHardlinks(const char *path) {
+    struct stat file_stat;
+    
+    if (stat(path, &file_stat) == -1) {
+        perror("stat");
+        return -1;
+    }
+    
+    return file_stat.st_nlink;
+}
+
+bool esHardlinkUnico(const char *path) {
+    struct stat file_stat;
+    
+    if (stat(path, &file_stat) == -1) {
+        perror("stat");
+        return -1;
+    }
+    
+    // Si st_nlink == 1, solo existe este enlace
+    return (file_stat.st_nlink == 1);
+}
+
+```
 
 ### Tag de File
 
