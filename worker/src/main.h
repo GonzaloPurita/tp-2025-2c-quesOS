@@ -11,11 +11,8 @@
 #include <commons/config.h>
 #include <commons/log.h>
 #include <utils/paquete.h>
-#include <commons/collections/dictionary.h>
 
 pthread_t hilo_listener;
-
-atomic_bool interrupcion;
 
 int enviar_identificador_a_master(char* id);
 

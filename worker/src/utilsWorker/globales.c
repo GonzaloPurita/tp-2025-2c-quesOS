@@ -4,6 +4,11 @@
 int conexionMaster;
 int conexionStorage;
 
+t_log* loggerWorker;
+t_config_worker* configWorker;
+
+atomic_bool interrupcion;
+
 // Datos globales
 int TAM_PAGINA;
 int TAM_MEMORIA;

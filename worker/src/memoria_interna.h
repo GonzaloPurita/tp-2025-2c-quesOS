@@ -1,7 +1,7 @@
 #ifndef MEM_INT_H_
 #define MEM_INT_H_
 
-#include "main.h"
+#include <commons/collections/dictionary.h>
 #include "query_interpreter.h"
 
 typedef struct {

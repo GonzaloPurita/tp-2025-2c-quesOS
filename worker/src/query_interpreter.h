@@ -1,7 +1,16 @@
 #ifndef QUERY_INTERPRETER_H_
 #define QUERY_INTERPRETER_H_
 
-#include "main.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <commons/string.h>
+#include <commons/collections/list.h>
+#include <commons/log.h>
+#include <utilsWorker/globales.h>
+#include <utils/paquete.h>
 
 typedef enum {
     CREATE,
@@ -55,6 +64,6 @@ void ejecutar_flush(t_instruccion* inst);
 void ejecutar_delete(t_instruccion* inst);
 void ejecutar_end(t_instruccion* inst);
 
-void pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
+//void pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
 
 #endif

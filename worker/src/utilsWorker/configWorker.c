@@ -1,8 +1,5 @@
 #include "configWorker.h"
 
-t_config_worker* configWorker;
-t_log* loggerWorker;
-
 void iniciar_config(char* path) {
     configWorker = malloc(sizeof(t_config_worker));
     t_config * config = config_create(path);

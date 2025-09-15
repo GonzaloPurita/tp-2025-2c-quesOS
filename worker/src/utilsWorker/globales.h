@@ -1,12 +1,19 @@
 #ifndef GLOBALES_H_
 #define GLOBALES_H_
 
-#include "../main.h"
 #include "../memoria_interna.h"
+#include <commons/collections/dictionary.h>
+#include "configWorker.h"
+#include <stdatomic.h>
 
 // Conexiones globales
 extern int conexionMaster;
 extern int conexionStorage;
+
+extern t_log* loggerWorker;
+extern t_config_worker* configWorker;
+
+extern atomic_bool interrupcion;
 
 // Memoria
 extern int TAM_PAGINA;       // lo manda Storage
