@@ -13,6 +13,11 @@ void* MEMORIA;
 int TAM_BLOQUE;
 int PC_ACTUAL; //inicializo en 0
 
+frame* frames;
+
+// Diccionarios
+t_dictionary* diccionario_tablas; // clave = "file:tag", valor = tabla_pag*
+
 void iniciar_memoria(){
     TAM_PAGINA = TAM_BLOQUE;                // viene de Storage
     TAM_MEMORIA = configWorker->tam_memoria;    // viene del archivo de config
@@ -23,6 +28,8 @@ void iniciar_memoria(){
         log_error(loggerWorker, "Error al reservar memoria interna");
         exit(1);
     }
+
+    frames = calloc(CANTIDAD_MARCOS, sizeof(frame_t));
 
     log_debug(loggerWorker, "Memoria interna inicializada. TAM_MEMORIA=%d, TAM_PAGINA=%d, MARCOS=%d", TAM_MEMORIA, TAM_PAGINA, CANTIDAD_MARCOS);
 }

@@ -1,11 +1,7 @@
 #ifndef CONFIGURACION_WORKER_H_
 #define CONFIGURACION_WORKER_H_
 
-#include <commons/config.h>
-#include <commons/string.h>
-#include <commons/log.h>
-#include <stdlib.h>
-#include <string.h>
+#include "../main.h"
 
 typedef struct {
     char* ip_master; // IP_MASTER = 127.0.0.1

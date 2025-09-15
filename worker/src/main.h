@@ -4,7 +4,14 @@
 #include <utils/conexiones.h>
 #include <utils/paquete.h>
 #include <utilsWorker/configWorker.h>
-#include "pedidos.h"
+#include <utilsWorker/globales.h>
+#include <stdatomic.h>
+#include <stdlib.h>
+#include <string.h>
+#include <commons/config.h>
+#include <commons/log.h>
+#include <utils/paquete.h>
+#include <commons/collections/dictionary.h>
 
 pthread_t hilo_listener;
 
@@ -12,4 +19,4 @@ atomic_bool interrupcion;
 
 int enviar_identificador_a_master(char* id);
 
-#endif /* MAIN_H_ */
+#endif

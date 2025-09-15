@@ -2,9 +2,6 @@
 #define QUERY_INTERPRETER_H_
 
 #include "main.h"
-#include "globales.h"
-#include "paquete.h"
-#include "pedidos.h"
 
 typedef enum {
     CREATE,
@@ -43,7 +40,7 @@ t_instruccion* decode(char* instruccion_raw);
 t_opcode obtener_opcode(char* nombre);
 void execute(t_instruccion* inst);
 void destruir_instruccion(t_instruccion* inst);
-t_formato* mapear_formato(t_instruccion* inst);
+t_formato* mapear_formato(char* recurso);
 void destruir_formato(t_formato* formato);
 
 
@@ -60,4 +57,4 @@ void ejecutar_end(t_instruccion* inst);
 
 void pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
 
-#ifndef /* QUERY_INTERPRETER_H_ */
+#endif
