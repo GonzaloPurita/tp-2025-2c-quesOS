@@ -4,7 +4,6 @@
 #include <stdatomic.h>
 #include <commons/collections/dictionary.h>
 #include <commons/log.h>
-#include "estructura_memoria.h"
 
 typedef struct t_config_worker t_config_worker;
 typedef struct frame frame;
