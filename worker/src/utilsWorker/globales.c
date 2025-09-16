@@ -1,5 +1,5 @@
 #include "globales.h"
-#include "../memoria_interna.h"
+#include <stdlib.h>
 #include "configWorker.h"
 
 // Conexiones globales

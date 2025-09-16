@@ -1,10 +1,8 @@
-#ifndef MEM_INT_H_
-#define MEM_INT_H_
+#ifndef ESTRUCTURAS_MEMORIA_H
+#define ESTRUCTURAS_MEMORIA_H
 
-#include <utilsWorker/api_memoria.h>
-#include <utilsWorker/globales.h>
-#include <commons/string.h>
-#include <utilsWorker/formato.h>
+#include <stdbool.h>
+#include <commons/collections/dictionary.h>
 
 struct frame {
     bool ocupado; // indica si está asignado a una pagina
@@ -29,8 +27,4 @@ struct tabla_pag {
     t_dictionary* paginas; // clave = nro_pagina (string), valor = entrada_pag*
 };
 
-
-int obtener_marco_libre_o_victima();
-int elegir_victima();
-
-#endif 
+#endif

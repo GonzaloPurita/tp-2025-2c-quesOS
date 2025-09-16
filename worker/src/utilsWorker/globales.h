@@ -4,10 +4,11 @@
 #include <stdatomic.h>
 #include <commons/collections/dictionary.h>
 #include <commons/log.h>
+#include "estructuras_memoria.h"
 
 typedef struct t_config_worker t_config_worker;
-typedef struct frame frame;
-typedef struct tabla_pag tabla_pag;
+// typedef struct frame frame;
+// typedef struct tabla_pag tabla_pag;
 typedef struct t_query_context t_query_context;
 
 /* conexiones */
