@@ -1,42 +1,43 @@
 #ifndef GLOBALES_H_
 #define GLOBALES_H_
 
-#include <commons/collections/dictionary.h>
-#include <stdlib.h>
 #include <stdatomic.h>
+#include <commons/collections/dictionary.h>
 #include <commons/log.h>
+#include "estructura_memoria.h"
 
-// tengo que poner este para no poner el include y tener dependencia circular
+typedef struct t_config_worker t_config_worker;
 typedef struct frame frame;
 typedef struct tabla_pag tabla_pag;
-typedef struct t_config_worker t_config_worker;
 typedef struct t_query_context t_query_context;
 
-// Conexiones globales
+/* conexiones */
 extern int conexionMaster;
 extern int conexionStorage;
 
+/* logger global */
 extern t_log* loggerWorker;
+
+/* config global */
 extern t_config_worker* configWorker;
+
+/* otros externos ... */
 extern atomic_bool interrupcion;
 extern t_query_context* query_actual;
 
-// Memoria
-extern int TAM_PAGINA;       // lo manda Storage
-extern int TAM_MEMORIA;      // viene del config
-extern int CANTIDAD_MARCOS;  // calculado
-extern void* MEMORIA;        // malloc general
-
+/* memoria */
+extern int TAM_PAGINA;
+extern int TAM_MEMORIA;
+extern int CANTIDAD_MARCOS;
+extern void* MEMORIA;
 extern frame* frames;
 
-// Datos
-extern int TAM_BLOQUE;
+/* diccionarios */
+extern t_dictionary* diccionario_tablas;
+
+/* querys */
 extern int PC_ACTUAL;
-
-// Diccionarios
-extern t_dictionary* diccionario_tablas; // clave = "file:tag", valor = tabla_pag*
-
-// Funciones
+extern int TAM_BLOQUE;
 
 void iniciar_memoria();
 

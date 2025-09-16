@@ -1,22 +1,18 @@
 #ifndef CONFIGURACION_WORKER_H_
 #define CONFIGURACION_WORKER_H_
 
-#include <commons/log.h>
-#include <stdlib.h>
-
 typedef struct t_config_worker {
-    char* ip_master; // IP_MASTER = 127.0.0.1
-    char* ip_storage; // IP_STORAGE = 127.0.0.1
-    char* algoritmo_reemplazo; // ALGORITMO_REEMPLAZO = LRU o CLOCK-M
-    char* path_scripts; // 
-    char* log_level; // LOG_LEVEL = TRACE
-    int puerto_master; // PUERTO_MASTER = 9001
-    int puerto_storage; // PUERTO_STORAGE = 9002
-    int tam_memoria; // 4096
-    int retardo_memoria; // 1500
+    char* ip_master;
+    char* ip_storage;
+    char* algoritmo_reemplazo;
+    char* path_scripts;
+    char* log_level;
+    int puerto_master;
+    int puerto_storage;
+    int tam_memoria;
+    int retardo_memoria;
 } t_config_worker;
 
-// Config del Kernel Global
 extern t_config_worker* configWorker;
 
 void iniciar_config(char* path);

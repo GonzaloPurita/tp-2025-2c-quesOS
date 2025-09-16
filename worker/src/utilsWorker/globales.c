@@ -1,4 +1,5 @@
 #include "globales.h"
+#include "../memoria_interna.h"
 #include "configWorker.h"
 
 // Conexiones globales
@@ -17,7 +18,7 @@ int CANTIDAD_MARCOS;
 void* MEMORIA;
 
 int TAM_BLOQUE;
-int PC_ACTUAL; //inicializo en 0
+int PC_ACTUAL;
 
 frame* frames;
 
