@@ -4,27 +4,27 @@
 #include <stdbool.h>
 #include <commons/collections/dictionary.h>
 
-struct frame {
+typedef struct frame {
     bool ocupado; // indica si está asignado a una pagina
     bool modificado;
     bool uso;
     char* file;
     char* tag;
     int page_num;
-};
+} frame;
 
 // Entrada en la tabla de páginas
-struct entrada_pag {
+typedef struct entrada_pag {
     int indice_frame;
     bool presente; // indica si esta en memoria o en storage
     bool modificado;
     bool uso;
-};
+} entrada_pag;
 
-struct tabla_pag {
+typedef struct tabla_pag {
     char* file;
     char* tag;
     t_dictionary* paginas; // clave = nro_pagina (string), valor = entrada_pag*
-};
+} tabla_pag;
 
 #endif
