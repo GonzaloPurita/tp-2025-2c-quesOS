@@ -1,9 +1,10 @@
-#include "configStorage.h"
+#include "configs.h"
 
 t_config_storage* configStorage;
+t_superblock* superblock;
 t_log* loggerStorage;
 
-void iniciar_config(char* path){
+void inicializarConfigStorage() {
     configStorage = malloc(sizeof(t_config_storage));
     t_config* config = config_create("storage.config");
 
@@ -22,10 +23,27 @@ void iniciar_config(char* path){
     loggerStorage = log_create("storage.log", "Storage", 1, log_level_from_string(configStorage->log_level));
 }
 
+void incializarSuperblock() {
+    superblock = malloc(sizeof(t_superblock));
+    t_config* config = config_create("superblock.config");
 
-void liberar_config() {
+    superblock->fssize = config_get_int_value(config, "FS_SIZE");
+    superblock->blocksize = config_get_int_value(config, "BLOCK_SIZE");
+
+    superblock->nroBloques = superblock->fssize / superblock->blocksize;
+
+    config_destroy(config);
+}
+
+void inicializarConfigs() {
+    inicializarConfigStorage();
+    incializarSuperblock();
+}
+
+void liberarConfigs() {
     free(configStorage->punto_montaje);
     free(configStorage->log_level);
     free(configStorage);
+    free(superblock);
     log_destroy(loggerStorage);
 }
