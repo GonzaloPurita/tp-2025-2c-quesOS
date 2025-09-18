@@ -47,3 +47,14 @@ void liberarConfigs() {
     free(superblock);
     log_destroy(loggerStorage);
 }
+
+char* estadoToString(t_estado_fileTag estado) {
+    switch (estado) {
+        case WORK_IN_PROGRESS:
+            return "WORK_IN_PROGRESS";
+        case COMMITED:
+            return "COMMITED";
+        default:
+            return "UNKNOWN";
+    }
+}

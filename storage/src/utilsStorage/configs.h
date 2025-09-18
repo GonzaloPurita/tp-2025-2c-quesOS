@@ -22,6 +22,11 @@ typedef struct {
     int nroBloques; // 64
 } t_superblock;
 
+typedef enum {
+    WORK_IN_PROGRESS,
+    COMMITED
+}t_estado_fileTag;
+
 extern t_config_storage* configStorage;
 extern t_superblock* superblock;
 extern t_log* loggerStorage;
@@ -44,5 +49,7 @@ void inicializarConfigs();
  * el módulo de almacenamiento ya no esté en uso para evitar fugas de memoria.
  */
 void liberarConfigs();
+
+char* estadoToString(t_estado_fileTag estado);
 
 #endif 

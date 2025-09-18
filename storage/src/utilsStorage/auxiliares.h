@@ -32,5 +32,8 @@ int borrar(const char* path);
 int crearDirectorio(const char* path);
 
 char* rutaCompleta(char* nombre);
+bool directorioExiste(const char* path);
+char* buscarBloqueFisico(int numeroBloqueFisico);
+char* crearNombreBloque(int nroBloque);
 
 #endif
