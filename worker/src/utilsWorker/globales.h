@@ -39,6 +39,8 @@ extern t_dictionary* diccionario_tablas;
 extern int PC_ACTUAL;
 extern int TAM_BLOQUE;
 
+extern int puntero_clock;
+
 void iniciar_memoria();
 
 #endif

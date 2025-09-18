@@ -4,6 +4,7 @@
 #include <commons/string.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 t_list* paginas_necesarias(int direccion_base, int tamanio) {
     t_list* paginas = list_create();
@@ -100,19 +101,87 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
     }
 }
 
+int obtener_timestamp() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (int)(tv.tv_sec) * 1000 + (tv.tv_usec / 1000); // tiempo en milisegundos
+}
+
 int obtener_marco_libre_o_victima() {
+    //Busco un marco libre
     for (int i = 0; i < CANTIDAD_MARCOS; i++) {
-        if (!frames[i].ocupado) return i;
+        if (!frames[i].ocupado) {
+            if(strcmp(configWorker->algoritmo_reemplazo, "LRU") == 0) {
+                frames[i].timestamp = obtener_timestamp(); // actualizo el timestamp si es LRU
+            }
+            return i;
+        }
     }
-    return elegir_victima(); // según algoritmo de reemplazo
+    return elegir_victima();
 }
 
 int elegir_victima() {
-    // TODO: implementar algoritmo de reemplazo
-    for (int i = 0; i < CANTIDAD_MARCOS; i++) {
-        if (frames[i].ocupado) return i;
+    if (strcmp(configWorker->algoritmo_reemplazo, "LRU") == 0) {
+        return elegir_victima_LRU();
+    } 
+    else if (strcmp(configWorker->algoritmo_reemplazo, "CLOCK-M") == 0) {
+        return elegir_victima_CLOCKM();
     }
+
+    log_error(loggerWorker, "Algoritmo de reemplazo desconocido: %s", configWorker->algoritmo_reemplazo);
     return 0;
+}
+
+int elegir_victima_LRU() {
+    int victima = 0;
+
+    for (int i = 1; i <= CANTIDAD_MARCOS; i++) { // no se si tiene que ser < o <=
+        if (frames[i].timestamp < frames[victima].timestamp) {
+            frames[i].timestamp = obtener_timestamp();
+            victima = i;
+        }
+    }
+
+    log_debug(loggerWorker, "Victima LRU seleccionada: marco %d", victima);
+    return victima;
+}
+
+int elegir_victima_CLOCKM() {
+    int vueltas = 0;
+    int inicio = puntero_clock;
+
+    while (1) {
+        frame* frame = &frames[puntero_clock];
+
+        // Caso 1: uso=0, modificado=0
+        if (frame->ocupado && !frame->uso && !frame->modificado) {
+            int victima = puntero_clock;
+            puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+            log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=0): marco %d", victima);
+            return victima;
+        }
+
+        // Caso 2: uso=0, modificado=1
+        if (vueltas > 0 && frame->ocupado && !frame->uso && frame->modificado) {
+            int victima = puntero_clock;
+            puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+            log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=1): marco %d", victima);
+            return victima;
+        }
+
+        // Si uso=1 → lo pongo en 0
+        if (frame->uso) {
+            frame->uso = false;
+        }
+
+        // avanzo el puntero
+        puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+
+        // ya di una vuelta completa
+        if (puntero_clock == inicio) {
+            vueltas++;
+        }
+    }
 }
 
 void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
@@ -141,6 +210,7 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
         frames[marco].file = strdup(formato->file_name);
         frames[marco].tag = strdup(formato->tag);
         frames[marco].page_num = nro_pagina;
+        frames[marco].timestamp = obtener_timestamp();
 
         // actualizo la tabla de páginas
         char* clave = string_itoa(nro_pagina);

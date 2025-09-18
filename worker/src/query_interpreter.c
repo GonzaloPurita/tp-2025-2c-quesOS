@@ -317,7 +317,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
-            pedir_pagina_a_storage(formato, *nro_pagina); //TODO: abajo plantee la funcion pero hay que revisarla
+            pedir_pagina_a_storage(formato, *nro_pagina);
         }
     }
 
@@ -355,7 +355,7 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
-            pedir_pagina_a_storage(formato, *nro_pagina); //TODO: abajo plantee la funcion pero hay que revisarla
+            pedir_pagina_a_storage(formato, *nro_pagina);
         }
     }
 
@@ -380,6 +380,36 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
     char* recurso = inst->parametros[0];
     //TODO
+}
+
+void guardar_paginas_modificadas() {
+    for (int i = 0; i < CANTIDAD_MARCOS; i++) {
+        frame* f = &frames[i]; // uso un frame* porque asi puedo usar la -> para acceder a los campos
+
+        if (f->ocupado && f->modificado) {
+            int base_memoria = i * TAM_PAGINA;
+            char* contenido = malloc(TAM_PAGINA);
+            memcpy(contenido, MEMORIA + base_memoria, TAM_PAGINA);
+
+            t_paquete* paquete = crear_paquete();
+            paquete->codigo_operacion = GUARDAR_MODIFICADAS;
+
+            agregar_a_paquete(paquete, f->file, strlen(f->file) + 1);
+            agregar_a_paquete(paquete, f->tag, strlen(f->tag) + 1);
+            agregar_a_paquete(paquete, &f->page_num, sizeof(int));
+            agregar_a_paquete(paquete, contenido, TAM_PAGINA);
+
+            enviar_paquete(paquete, conexionStorage);
+            eliminar_paquete(paquete);
+
+            log_debug(loggerWorker, "Página modificada guardada en Storage: %s:%s - pagina %d (marco %d)", f->file, f->tag, f->page_num, i);
+
+            f->modificado = false;
+
+            free(contenido);
+        }
+    }
+    log_debug(loggerWorker, "Finalizado guardado de páginas modificadas.");
 }
 
 // void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){

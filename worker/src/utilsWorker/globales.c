@@ -20,6 +20,8 @@ void* MEMORIA;
 int TAM_BLOQUE;
 int PC_ACTUAL;
 
+int puntero_clock = 0;
+
 frame* frames;
 
 // Diccionarios

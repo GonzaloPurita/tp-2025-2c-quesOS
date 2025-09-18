@@ -9,5 +9,8 @@
 
 int obtener_marco_libre_o_victima();
 int elegir_victima();
+int obtener_timestamp();
+int elegir_victima_CLOCKM();
+int elegir_victima_LRU();
 
 #endif 

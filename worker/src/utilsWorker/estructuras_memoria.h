@@ -11,6 +11,7 @@ typedef struct frame {
     char* file;
     char* tag;
     int page_num;
+    int timestamp;
 } frame;
 
 // Entrada en la tabla de páginas
