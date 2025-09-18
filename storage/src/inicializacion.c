@@ -4,7 +4,6 @@
 void formatearFS();
 void crearBitmap();
 void crearRutaFiles();
-void crearFileInicial();
 
 void inicializarFS() {
     inicializarConfigs();
@@ -49,10 +48,4 @@ void crearRutaFiles() {
         log_error(loggerStorage, "Error creando el directorio files");
     }
     free(rutaFiles);
-}
-
-void crearFileInicial() {
-    char* rutaFile = rutaCompleta("/files/file1.txt");
-
-    free(rutaFile);
 }

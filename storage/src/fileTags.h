@@ -8,8 +8,8 @@
 
 bool crearFileTag(char* nombreFile, char* nombreTag);
 bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico);
-bool crearFileInicial();
 char* rutaFileTag(char* nombreFile, char* nombreTag);
 bool cambiarEstadoMetaData(char* file, char* tag, t_estado_fileTag estadoNuevo);
+bool crearFileInicial();
 
 #endif /* _FILETAGS_H */

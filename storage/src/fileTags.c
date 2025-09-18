@@ -15,6 +15,7 @@ bool crearFileInicial() {
     if(!cambiarEstadoMetaData("initial_file", "BASE", COMMITED)) { // Supongo que arranca como COMMITED, CHEQUEAR
         return false;
     }
+    return true;
 }
 
 bool crearFileTag(char* nombreFile, char* nombreTag) {
