@@ -4,19 +4,7 @@ void* recibirCliente(void* cliente);
 
 int main(int argc, char* argv[]) {
     inicializarFS();
-    
-    char* puertoEscucha = string_itoa(configStorage->puerto_escucha);
-    int conexionServer = crearConexionServidor(puertoEscucha);
-    free(puertoEscucha);
-
-    while(1) {
-        int cliente = esperarCliente(conexionServer);
-        int* clientePtr = malloc(sizeof(int));
-        *clientePtr = cliente;
-        pthread_t hilo;
-        pthread_create(&hilo, NULL, recibirCliente, clientePtr);
-        pthread_detach(hilo);
-    }
+    return 0;
 }
 
 void* recibirCliente(void* cliente) {

@@ -9,7 +9,7 @@
 
 typedef struct {
     int puerto_escucha; //9002
-    int fresh_start; // 1=TRUE 0=FALSE
+    bool fresh_start; // 1=TRUE 0=FALSE
     char* punto_montaje; // /home/utnso/storage
     int retardo_operacion; // 8000
     int retardo_acceso_bloque; // 4000

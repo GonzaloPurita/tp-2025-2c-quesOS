@@ -1,4 +1,5 @@
 #include "fileTags.h"
+#include <errno.h>
 
 // Funciones privadas
 bool crearMetaData(char* path);
@@ -108,22 +109,21 @@ bool crearMetaData(char* path) {
 
     // Creamos los valores de metadata
     t_dictionary* data = dictionary_create();
-    dictionary_put(data, "TAMAÑO", 0);
+    dictionary_put(data, "TAMAÑO", "0");
     dictionary_put(data, "BLOQUES", "[]");
     dictionary_put(data, "ESTADO", "WORK_IN_PROGRESS");
     metadata->properties = data;
 
     // Construimos el path del metadata.config
     metadata->path = string_duplicate(path);
-    string_append(&metadata->path, "/metadata.config");
+    string_append(&metadata->path, "/metadata.config"); 
 
-    // Guardamos el archivo
+    // Guardamos el MetaData como archivo
     if(config_save_in_file(metadata, metadata->path) == -1) {
         log_error(loggerStorage, "Error creando metadata, no se pudo guardar en el archivo");
         config_destroy(metadata);
         return false;
     }
-    config_destroy(metadata);
     return true;
 }
 
@@ -149,17 +149,22 @@ bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBlo
     }
 
     // Genero la ruta para el bloque lógico
+    char* rutaBloqueLogicoTemp = string_duplicate(rutaBloqueLogico); // El append modifica el puntero, por eso hago una copia
     char* nombre = crearNombreBloque(numeroBloqueLogico);
-    string_append(&rutaBloqueLogico, nombre);
+    string_append(&rutaBloqueLogicoTemp, nombre);
     free(nombre);
 
-    int linkResult = link(rutaBloqueFisico, rutaBloqueLogico); // Esto genera el hard link
+    int linkResult = link(rutaBloqueFisico, rutaBloqueLogicoTemp); // Esto genera el hard link
     if (linkResult == -1) {
-        log_error(loggerStorage, "Error creando hard link, no se pudo crear el enlace entre %s y %s", rutaBloqueFisico, rutaBloqueLogico);
+        log_error(loggerStorage, 
+            "Error creando hard link: origen=%s destino=%s errno=%d (%s)", 
+            rutaBloqueFisico, rutaBloqueLogico, errno, strerror(errno));
         free(rutaBloqueFisico);
+        free(rutaBloqueLogicoTemp);
         return false;
     }
-     
+    free(rutaBloqueFisico);
+    free(rutaBloqueLogicoTemp);
     return true;
 }
 
