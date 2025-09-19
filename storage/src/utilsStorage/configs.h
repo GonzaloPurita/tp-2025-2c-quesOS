@@ -50,6 +50,13 @@ void inicializarConfigs();
  */
 void liberarConfigs();
 
+/**
+ * @brief Convierte un estado de tipo t_estado_fileTag a su representación en cadena de caracteres.
+ *
+ * @param estado El estado de tipo t_estado_fileTag que se desea convertir.
+ * @return Un puntero a una cadena de caracteres que representa el estado.
+ *         La cadena devuelta no necesariamente debe ser liberada, depende de como se pida.
+ */
 char* estadoToString(t_estado_fileTag estado);
 
 #endif 

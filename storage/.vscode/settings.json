@@ -4,5 +4,8 @@
     "*.h": "c"
   },
   "C_Cpp.autoAddFileAssociations": false,
-  "C_Cpp.errorSquiggles": "disabled"
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
+    "clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling"
+  ]
 }

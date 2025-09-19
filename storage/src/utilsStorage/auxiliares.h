@@ -31,9 +31,29 @@ int borrar(const char* path);
  */
 int crearDirectorio(const char* path);
 
+/**
+ * @brief Genera la ruta completa a partir de un nombre dado.
+ * 
+ * @param nombre Nombre base para generar la ruta completa.
+ * @return Un puntero a una cadena de caracteres que contiene la ruta completa.
+ *         Es responsabilidad del llamador liberar la memoria asignada.
+ */
 char* rutaCompleta(char* nombre);
+
+/**
+ * @brief Verifica si un directorio existe en la ruta especificada.
+ * 
+ * @param path Ruta del directorio a verificar.
+ * @return true si el directorio existe, false en caso contrario.
+ */
 bool directorioExiste(const char* path);
-char* buscarBloqueFisico(int numeroBloqueFisico);
-char* crearNombreBloque(int nroBloque);
+
+/**
+ * @brief Verifica si un archivo existe en la ruta especificada.
+ *
+ * @param path Ruta del archivo a verificar.
+ * @return true si el archivo existe, false en caso contrario.
+ */
+bool archivoExiste(const char* path);
 
 #endif

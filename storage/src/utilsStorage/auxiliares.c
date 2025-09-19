@@ -69,32 +69,3 @@ char* rutaCompleta(char* nombre) {
     string_append(&ruta, nombre);
     return ruta;
 }
-
-char* buscarBloqueFisico(int numeroBloqueFisico) {
-    // Validación de datos
-    if (numeroBloqueFisico < 0) {
-        log_error(loggerStorage, "Error buscando bloque físico, el número de bloque físico es negativo");
-        return NULL;
-    }
-
-    char* nombreBloque = crearNombreBloque(numeroBloqueFisico);
-    char* rutaBloqueFisico = rutaCompleta("/physical_blocks/");
-    string_append(&rutaBloqueFisico, nombreBloque);
-
-    if (!archivoExiste(rutaBloqueFisico)) {
-        log_error(loggerStorage, "Error buscando bloque físico, el bloque físico %s no existe", nombreBloque);
-        free(rutaBloqueFisico);
-        free(nombreBloque); 
-        return NULL;
-    }
-
-    free(nombreBloque); 
-    return rutaBloqueFisico;
-}
-
-char* crearNombreBloque(int nroBloque) {
-    // Generar el nombre del bloque con ceros a la izquierda y extensión .dat
-    char nombreBloque[20]; // Suficiente para "block" + 4 dígitos + ".dat" + '\0'
-    snprintf(nombreBloque, sizeof(nombreBloque), "block%04d.dat", nroBloque);
-    return string_duplicate(nombreBloque);
-}

@@ -1,9 +1,7 @@
 #include "fileTags.h"
-#include <errno.h>
 
 // Funciones privadas
 bool crearMetaData(char* path);
-bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico);
 
 bool crearFileInicial() {
     if (!crearFileTag("initial_file", "BASE")) {
@@ -63,37 +61,6 @@ bool crearFileTag(char* nombreFile, char* nombreTag) {
     return true;
 }
 
-bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico) {
-    // Validación de datos
-    if (nombreFile == NULL || nombreTag == NULL) {
-        log_error(loggerStorage, "Error agregando bloque lógico, el nombre del file o del tag es NULL");
-        return false;
-    }
-    if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
-        log_error(loggerStorage, "Error agregando bloque lógico, el nombre del file o del tag está vacío");
-        return false;
-    }
-    if (numeroBloqueLogico < 0 || numeroBloqueFisico < 0) {
-        log_error(loggerStorage, "Error agregando bloque lógico, el número de bloque lógico o físico es negativo");
-        return false;
-    }
-
-    // Creo la ruta completa a donde va el bloque lógico
-    char* rutaBloqueLogico = rutaCompleta("/files/");
-    string_append(&rutaBloqueLogico, nombreFile);
-    string_append(&rutaBloqueLogico, "/");
-    string_append(&rutaBloqueLogico, nombreTag);
-    string_append(&rutaBloqueLogico, "/logical_blocks/");
-
-    if(!crearHardlink(rutaBloqueLogico, numeroBloqueLogico, numeroBloqueFisico)) {
-        free(rutaBloqueLogico);
-        return false;
-    }
-
-    free(rutaBloqueLogico);
-    return true;
-}
-
 bool crearMetaData(char* path) {
     // Validación de datos
     if (path == NULL) {
@@ -127,48 +94,6 @@ bool crearMetaData(char* path) {
     return true;
 }
 
-bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico) {
-    // Validación de datos
-    if (rutaBloqueLogico == NULL) {
-        log_error(loggerStorage, "Error creando hard link, la ruta del bloque lógico es NULL");
-        return false;
-    }
-    if (string_is_empty(rutaBloqueLogico)) {
-        log_error(loggerStorage, "Error creando hard link, la ruta del bloque lógico está vacía");
-        return false;
-    }
-    if (numeroBloqueLogico < 0 || numeroBloqueFisico < 0) {
-        log_error(loggerStorage, "Error creando hard link, el número de bloque lógico o físico es negativo");
-        return false;
-    }
-
-    // Busco el bloque físico
-    char* rutaBloqueFisico = buscarBloqueFisico(numeroBloqueFisico);
-    if(rutaBloqueFisico == NULL) {
-        return false;
-    }
-
-    // Genero la ruta para el bloque lógico
-    char* rutaBloqueLogicoTemp = string_duplicate(rutaBloqueLogico); // El append modifica el puntero, por eso hago una copia
-    char* nombre = crearNombreBloque(numeroBloqueLogico);
-    string_append(&rutaBloqueLogicoTemp, nombre);
-    free(nombre);
-
-    int linkResult = link(rutaBloqueFisico, rutaBloqueLogicoTemp); // Esto genera el hard link
-    if (linkResult == -1) {
-        log_error(loggerStorage, 
-            "Error creando hard link: origen=%s destino=%s errno=%d (%s)", 
-            rutaBloqueFisico, rutaBloqueLogico, errno, strerror(errno));
-        free(rutaBloqueFisico);
-        free(rutaBloqueLogicoTemp);
-        return false;
-    }
-    free(rutaBloqueFisico);
-    free(rutaBloqueLogicoTemp);
-    return true;
-}
-
-
 char* rutaFileTag(char* nombreFile, char* nombreTag) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
@@ -192,6 +117,37 @@ char* rutaFileTag(char* nombreFile, char* nombreTag) {
     }
 
     return ruta;
+}
+
+bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico) {
+    // Validación de datos
+    if (nombreFile == NULL || nombreTag == NULL) {
+        log_error(loggerStorage, "Error agregando bloque lógico, el nombre del file o del tag es NULL");
+        return false;
+    }
+    if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
+        log_error(loggerStorage, "Error agregando bloque lógico, el nombre del file o del tag está vacío");
+        return false;
+    }
+    if (numeroBloqueLogico < 0 || numeroBloqueFisico < 0) {
+        log_error(loggerStorage, "Error agregando bloque lógico, el número de bloque lógico o físico es negativo");
+        return false;
+    }
+
+    // Creo la ruta completa a donde va el bloque lógico
+    char* rutaBloqueLogico = rutaCompleta("/files/");
+    string_append(&rutaBloqueLogico, nombreFile);
+    string_append(&rutaBloqueLogico, "/");
+    string_append(&rutaBloqueLogico, nombreTag);
+    string_append(&rutaBloqueLogico, "/logical_blocks/");
+
+    if(!crearHardlink(rutaBloqueLogico, numeroBloqueLogico, numeroBloqueFisico)) {
+        free(rutaBloqueLogico);
+        return false;
+    }
+
+    free(rutaBloqueLogico);
+    return true;
 }
 
 // Funciones genéricas de metadata

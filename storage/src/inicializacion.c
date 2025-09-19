@@ -2,7 +2,6 @@
 
 // Funciones privadas --> No están en el .h porque no se usa afuera
 void formatearFS();
-void crearBitmap();
 void crearRutaFiles();
 void crearBloques();
 
@@ -11,20 +10,15 @@ void inicializarFS() {
     log_info(loggerStorage, "Storage iniciado");
     if (configStorage->fresh_start) { // Hay que generar todo
         formatearFS();
-        log_debug(loggerStorage, "Formateo del sistema de archivos completo");
         crearRutaFiles();
-        log_debug(loggerStorage, "Creación del directorio files");
         crearBloques();
-        log_debug(loggerStorage, "Creación de los bloques físicos");
         escribirBloqueInicial();
-        log_debug(loggerStorage, "Escritura del bloque inicial");
-        crearBitmap(); // TODO: Implementar
-        log_debug(loggerStorage, "Creación del bitmap");
+        inicializarBitmap();
+        bitarray_set_bit(bitmap, 0); // TODO: A chequear
         crearFileInicial();
-        log_debug(loggerStorage, "Creación del file inicial");
     }
     else { // Tenemos que usar lo que ya tenemos
-
+        // TODO: Ver como se hace, supongo que solo hay que abrir el bitmap
     }
     log_debug(loggerStorage, "Sistema de archivos listo para usarse");
 }
@@ -47,11 +41,6 @@ void formatearFS() { // Borro todo lo que haya de antes.
     free(rutaBlocks);
     free(rutaPhysical);
     free(rutaFiles);
-}
-
-void crearBitmap() {
-    // TODO: Usar el mmap().
-    return;
 }
 
 void crearRutaFiles() {
