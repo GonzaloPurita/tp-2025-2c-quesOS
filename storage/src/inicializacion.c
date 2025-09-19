@@ -16,6 +16,8 @@ void inicializarFS() {
         log_debug(loggerStorage, "Creación del directorio files");
         crearBloques();
         log_debug(loggerStorage, "Creación de los bloques físicos");
+        escribirBloqueInicial();
+        log_debug(loggerStorage, "Escritura del bloque inicial");
         crearBitmap(); // TODO: Implementar
         log_debug(loggerStorage, "Creación del bitmap");
         crearFileInicial();
@@ -67,6 +69,12 @@ void crearBloques() {
     if (mkdir(rutaBloquesFisicos, 0700) == -1) { // El 0700 es para que solo el dueño tenga permisos
         log_error(loggerStorage, "Error creando el directorio physical_blocks");
     }
+
+    char* nombreBloque = crearNombreBloque(0);
+    char* rutaBloque = string_new();
+    string_append(&rutaBloque, rutaBloquesFisicos);
+    string_append(&rutaBloque, "/");
+    string_append(&rutaBloque, nombreBloque);
 
     // Creo los archivos que representan los bloques físicos
     for (int i = 0; i < superblock->nroBloques; i++) {

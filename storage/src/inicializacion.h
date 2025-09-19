@@ -4,6 +4,7 @@
 #include "utilsStorage/configs.h"
 #include "utilsStorage/auxiliares.h"
 #include "fileTags.h"
+#include "bloques.h"
 
 void inicializarFS();
 
