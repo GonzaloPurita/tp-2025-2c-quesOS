@@ -10,6 +10,8 @@ void iniciarConexionesMaster() {
     char* puerto = string_itoa(configMaster->puerto_escucha);
     server_fd_master = crearConexionServidor(puerto);
     free(puerto);
+    inicializarSemaforos();
+    workers_iniciar();
 
     log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
 
@@ -55,7 +57,7 @@ void* atenderCliente(void* arg) {
             memcpy(&worker_id, list_get(datos, 0), sizeof(int));
             list_destroy_and_destroy_elements(datos, free);
 
-            // Esto después se va a guardar en una estructura t_conexionWorker 
+            worker_registrar(worker_id, fd);
 
             // ACK y a otra cosa
             int ok = 1;
@@ -65,32 +67,38 @@ void* atenderCliente(void* arg) {
             enviar_paquete(r, fd);
             eliminar_paquete(r);
 
-            log_info(loggerMaster, "Worker %d conectado (fd=%d)", worker_id, fd); // Switchear al log obligatorio
-            break;
+            log_info(loggerMaster, "Workers conectados=%d, disponibles=%d", workers_conectados(), workers_disponibles());
+
+            int* fd_ptr = malloc(sizeof(int));
+            *fd_ptr = fd;
+            pthread_t th;
+            pthread_create(&th, NULL, atender_worker, fd_ptr);
+            pthread_detach(th);
+
+            return NULL; // Lanzo un NULL porque el hilo de atender_worker se encarga de cerrar el fd
+
+
         }
 
         case SUBMIT_QUERY: {
-            // SUBMIT_QUERY: [prioridad:int][persist:int][len:int][path:bytes]
             t_list* datos = recibir_paquete(fd);
-            if (list_size(datos) < 4) {
-                log_error(loggerMaster, "fd=%d: SUBMIT_QUERY incompleto (items=%d)", fd, list_size(datos));
-                list_destroy_and_destroy_elements(datos, free);
-                close(fd);
-                return NULL;
-            }
+            if (list_size(datos) < 3) { /* log + close + return */ }
 
             int prioridad = *(int*) list_get(datos, 0);
-            int persist   = *(int*) list_get(datos, 1);
-            int len       = *(int*) list_get(datos, 2);
-            char* path    = (char*) list_get(datos, 3);
+            int len       = *(int*) list_get(datos, 1);
+            char* path    = (char*) list_get(datos, 2);
             char* path_dup = strndup(path, len);
             list_destroy_and_destroy_elements(datos, free);
 
-            int qid = NEXT_QID++; 
+            int qid;
+            pthread_mutex_lock(&mutex_qid);
+            qid = NEXT_QID++;
+            pthread_mutex_unlock(&mutex_qid);
 
-            // TODO: crear t_query y encolarla a READY 
-            log_info(loggerMaster, "Query QID=%d recibida (prio=%d, %s, path=%s)",
-                     qid, prioridad, persist ? "persistente" : "efimera", path_dup);
+            // TODO: crear t_query y encolarla a READY
+
+            log_info(loggerMaster, "Query QID=%d recibida (prio=%d, path=%s)",
+                    qid, prioridad, path_dup);
 
             t_paquete* r = crear_paquete();
             r->codigo_operacion = RTA_SUBMIT_QUERY;
@@ -98,9 +106,6 @@ void* atenderCliente(void* arg) {
             enviar_paquete(r, fd);
             eliminar_paquete(r);
 
-            if (!persist) {
-                close(fd);  
-            }
             free(path_dup);
             break;
         }

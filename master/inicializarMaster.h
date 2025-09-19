@@ -1,14 +1,9 @@
-#include <commons/collections/dictionary.h>
-#include <commons/collections/queue.h>
-#include <utils/paquete.h> //op_code reales
+#include <utils/paquete.h>
+#include "t_conexionesWorkers.h"
 
 void iniciarConexionesMaster(void);
 void cerrarConexionesMaster(void);
 
-// hilos aceptadores
-void* recibirConexionesWorkers(void* arg);
-void* recibirConexionesQC(void* arg);
-
-// handlers (se llaman desde los aceptadores)
-void aceptarWorker(int cliente_fd);
-void aceptarQueryControl(int cliente_fd, int primer_op); // SUBMIT_QUERY esperado
+void* recibirConexiones(void* arg);
+void* atenderCliente(void* arg);
+void* atender_worker(void* arg);
