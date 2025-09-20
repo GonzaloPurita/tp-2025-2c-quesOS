@@ -1,7 +1,7 @@
 #include <stdint.h>
-#include <semaforos.h>
+#include <utils/semaforos.h>
 
-typedef enum { Q_READY, Q_EXEC, Q_EXIT } q_state;
+typedef enum { Q_READY, Q_EXEC, Q_EXIT } estado_query;
 
 typedef struct {
     int QID;
@@ -16,5 +16,9 @@ typedef struct {
     estado_query estado; // OPCIONAL: Podemos guardar el estado en el que esta.
 }t_query;
 
-t_query* crearQuery(int fd_qc, const char* path, int prioridad, int qid, uint64_t arrival);
+t_query* crearQuery(char* path, int prioridad);
 void destruirQuery(t_query* q);
+
+extern t_queue* cola_ready;
+extern t_list*  cola_exec;
+extern t_list*  cola_exit;

@@ -1,10 +1,11 @@
 #include <semaforos.h>
-#include "t_conexionesWorkers.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <commons/collections/list.h>
 #include <stdbool.h>
 #include <commons/collections/list.h>
+#include <utilsMaster/configMaster.h>
+#include <utils/paquete.h>
 
 t_list* LISTA_WORKERS = NULL;           // definición (no extern)
 
