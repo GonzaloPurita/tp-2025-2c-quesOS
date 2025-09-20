@@ -1,12 +1,8 @@
 #include <stdint.h>
 #include <utils/semaforos.h>
+#include <utils/qcb.h>
 
 typedef enum { Q_READY, Q_EXEC, Q_EXIT } estado_query;
-
-typedef struct {
-    int QID;
-    int PC;          // Program Counter
-} t_qcb;
 
 typedef struct {
     t_qcb* QCB; // PCB pero de Query
@@ -19,6 +15,6 @@ typedef struct {
 t_query* crearQuery(char* path, int prioridad);
 void destruirQuery(t_query* q);
 
-extern t_queue* cola_ready;
+extern t_list* cola_ready;
 extern t_list*  cola_exec;
 extern t_list*  cola_exit;

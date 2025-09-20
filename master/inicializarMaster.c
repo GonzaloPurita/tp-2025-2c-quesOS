@@ -95,7 +95,8 @@ void* atenderCliente(void* arg) {
             qid = NEXT_QID++;
             pthread_mutex_unlock(&mutex_qid);
 
-            // TODO: crear t_query y encolarla a READY
+            t_query* q = crearQuery(path_dup, prioridad);
+            free(path_dup);
 
             log_info(loggerMaster, "Query QID=%d recibida (prio=%d, path=%s)",
                     qid, prioridad, path_dup);

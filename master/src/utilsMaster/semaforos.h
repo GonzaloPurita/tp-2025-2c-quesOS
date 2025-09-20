@@ -8,6 +8,10 @@ extern pthread_mutex_t mutex_cola_exec;  // Mutex para proteger la cola de queri
 extern pthread_mutex_t mutex_cola_exit;  // Mutex para proteger la cola de queries terminadas
 extern pthread_mutex_t mutex_queries
 
+extern sem_t workers_disponibles; // Semáforo para contar los workers disponibles
+extern sem_t hay_query_ready;     // Semáforo para contar las queries en estado READY
+
+
 void inicializarSemaforos();
 void destruirSemaforos();
 

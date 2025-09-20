@@ -23,3 +23,19 @@ pthread_mutex_t* obtenerMutexPorEstado(char* estado) {
       return NULL; // Devuelve NULL si el estado no es válido
   }
 }
+
+void planificarSinDesalojo() {
+  while(1) {
+    sem_wait(&hay_query_ready); 
+    sem_wait(&workers_disponibles); 
+
+    // Saco la primer query de la cola de READY
+    pthread_mutex_lock(&mutex_cola_ready); 
+    t_query* query = list_remove(cola_ready, 0); 
+    pthread_mutex_unlock(&mutex_cola_ready); 
+
+    pthread_mutex_lock(&cola_exec); 
+    list_add(cola_exec, query); 
+    pthread_mutex_unlock(&cola_exec); 
+
+}

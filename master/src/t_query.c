@@ -22,3 +22,10 @@ t_query* crearQuery(char* path, int prioridad) {
         pthread_mutex_unlock(&mutex_queries);
         return NULL;
     }
+
+void destruirQuery(t_query* query) {
+    if (!query) return;
+    if (query->QCB) destruirQCB(query->QCB);
+    if (query->path) free(q->path);
+    free(query);
+}

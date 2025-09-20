@@ -1,4 +1,4 @@
-#include <semaforos.h>
+#include <utilsMaster/semaforos.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <commons/collections/list.h>

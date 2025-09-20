@@ -9,7 +9,9 @@
 
 typedef enum {
 	MENSAJE,
-
+	// Master <---> QUERY CONTROL
+	SUBMIT_QUERY,
+	RTA_SUBMIT_QUERY,
 	// WORKER <---> MASTER
 	ID_WORKER,
 	RTA_ID_WORKER,
@@ -19,7 +21,7 @@ typedef enum {
 	DESALOJO,
 	RTA_DESALOJO,
 	OP_WRITE,
-	QCB
+	QCB,
 	// WORKER <---> STORAGE
 	TAMANIO_BLOQUE,
 	OP_CREATE,
