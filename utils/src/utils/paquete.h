@@ -26,7 +26,8 @@ typedef enum {
 	OP_DELETE,
 	OP_TAG,
 	OP_COMMIT,
-	PED_PAG
+	PED_PAG,
+	GUARDAR_MODIFICADAS
 }op_code;
 
 
