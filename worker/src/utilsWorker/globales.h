@@ -22,7 +22,7 @@ extern t_log* loggerWorker;
 extern t_config_worker* configWorker;
 
 /* otros externos ... */
-extern atomic_bool interrupcion;
+extern atomic_int interrupt_flag;
 extern t_query_context* query_actual;
 
 /* memoria */

@@ -9,7 +9,7 @@ int conexionStorage;
 t_log* loggerWorker;
 t_config_worker* configWorker;
 
-atomic_bool interrupcion = false;
+atomic_int interrupt_flag = ATOMIC_VAR_INIT(0);
 
 // Datos globales
 int TAM_PAGINA;

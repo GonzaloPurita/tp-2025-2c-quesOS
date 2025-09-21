@@ -42,10 +42,10 @@ void recibir_queries(){
             
             list_destroy_and_destroy_elements(paquete, free);
 
-            if (interrupcion) {
+            if (atomic_load(&interrupt_flag)) {
                 guardar_paginas_modificadas(); // TODO: implementar
                 notificar_master_desalojo(PC_ACTUAL);
-                interrupcion = false;
+                atomic_store(&interrupt_flag, 0);
                 break;
             }
         }

@@ -36,7 +36,7 @@ void* listener_master() {
         int op = recibir_operacion(conexionMaster);
         if (op == DESALOJO) {
             log_debug(loggerWorker, "Master pidió desalojo");
-            interrupcion = true;
+            atomic_store(&interrupt_flag, 1);
         }
     }
     return NULL;
