@@ -29,3 +29,21 @@ void destruirQuery(t_query* query) {
     if (query->path) free(q->path);
     free(query);
 }
+
+void actualizarMetricas(estado_query estadoActual, estado_query estadoNuevo, t_query* query) {
+    query->estadoActual = estadoNuevo; 
+
+    //TODO: Implementar para prioridades y aging
+}
+
+void agregarAReadyPorPrioridad(t_query* query){
+    pthread_mutex_lock(&mutex_cola_ready);
+    // Agregar la query a la cola de ready según su prioridad
+    // Suponiendo que cola_ready es una lista ordenada por prioridad
+    int i = 0;
+    while (i < list_size(cola_ready) && ((t_query*)list_get(cola_ready, i))->prioridad >= query->prioridad) {
+        i++;
+    }
+    list_add_in_index(cola_ready, i, query);
+    pthread_mutex_unlock(&mutex_cola_ready);
+}

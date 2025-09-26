@@ -2,7 +2,7 @@
 
 // --- Binarios ---
 sem_t workers_disponibles; // Contador de workers libres
-sem_t hay query_ready; // Contador de queries en READY
+sem_t hay_query_ready; // Contador de queries en READY
 
 // --- MUTEX ---
 pthread_mutex_t mutex_workers;
@@ -11,6 +11,7 @@ pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_exec;
 pthread_mutex_t mutex_cola_exit;
 pthread_mutex_t mutex_queries;
+
 
 void inicializarSemaforos(void) {
     pthread_mutex_init(&mutex_workers, NULL);
