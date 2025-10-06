@@ -64,10 +64,19 @@ char* rutaBloqueFisico(int nroBloqueFisico);
 
 /**
  * @brief Inicializa el bitmap utilizado para gestionar los bloques físicos.
- * 
- * Esta función debe ser llamada antes de realizar operaciones con los bloques.
+ *
+ * Configura el bitmap en memoria, estableciendo todos los bloques como libres o según el estado inicial.
+ * Debe llamarse una vez al inicio del sistema con el bitmap ya creado.
  */
 void inicializarBitmap();
+
+/**
+ * @brief Carga el estado del bitmap desde almacenamiento persistente.
+ *
+ * Lee el bitmap desde disco y lo carga en memoria, reflejando el estado actual de los bloques físicos.
+ * Debe llamarse durante la inicialización del sistema de archivos.
+ */
+void cargarBitmap();
 
 /**
  * @brief Crea un hardlink entre un bloque lógico y un bloque físico.

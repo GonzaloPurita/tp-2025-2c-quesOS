@@ -114,6 +114,12 @@ bool validarTamanioEscritura(char* rutaBloque, size_t sizeDatos, bool agregar) {
 }
 
 void inicializarBitmap() {
+    for(int i = 0; i < bitarray_get_max_bit(bitmap); i++) {
+        bitarray_clean_bit(bitmap, i); // Pongo todos los bits en 0 (libres)
+    }
+}
+
+void cargarBitmap() {
     int bytes_bitmap = (superblock->nroBloques + 7) / 8; // Cantidad de bytes necesarios para el bitmap (redondeo hacia arriba)
 
     char* path = rutaCompleta("/bitmap.bin");

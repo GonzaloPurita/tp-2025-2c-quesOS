@@ -13,12 +13,13 @@ void inicializarFS() {
         crearRutaFiles();
         crearBloques();
         escribirBloqueInicial();
+        cargarBitmap();
         inicializarBitmap();
         bitarray_set_bit(bitmap, 0); // TODO: A chequear
         crearFileInicial();
     }
     else { // Tenemos que usar lo que ya tenemos
-        // TODO: Ver como se hace, supongo que solo hay que abrir el bitmap
+        cargarBitmap();
     }
     log_debug(loggerStorage, "Sistema de archivos listo para usarse");
 }
