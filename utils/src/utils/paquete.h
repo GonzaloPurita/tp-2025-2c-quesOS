@@ -8,7 +8,12 @@
 #include"conexiones.h"
 
 typedef enum {
-	MENSAJE
+	MENSAJE,
+	// Master <---> QUERY CONTROL
+	SUBMIT_QUERY,
+	RTA_SUBMIT_QUERY,
+	MENSAJE_LECTURA,
+	QUERY_FINALIZADA
 }op_code;
 
 

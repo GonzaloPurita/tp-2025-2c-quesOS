@@ -1,21 +1,35 @@
 #include "main.h"
 
 int main(int argc, char* argv[]) {
-    iniciar_config(argv[1], "Query_Control");
-    log_debug(loggerQueryControl, "Configuracion cargada. IP Master: %s, Puerto Master: %d, Log Level: %s",
-              configQueryControl->ip_master,
-              configQueryControl->puerto_master,
-              configQueryControl->log_level);
+
+    if(argc != 4){
+        printf("No se pasaron los parametros necesarios");
+        return EXIT_FAILURE;
+    }
+
+    char* path_config = argv[1];
+    char* path_query = argv[2];
+    int prioridad = atoi(argv[3]);
+
+    iniciar_config(path_config, "Query_Control");
+    
+    log_info(loggerQueryControl, "## Conexión al Master exitosa. IP: %s, Puerto: %d",
+             configQueryControl->ip_master, configQueryControl->puerto_master);
 
     int conexion = crearConexionCliente(configQueryControl->ip_master, string_itoa(configQueryControl->puerto_master));
     log_debug(loggerQueryControl, "Conectado al Master en %s:%d", configQueryControl->ip_master, configQueryControl->puerto_master);
 
     t_paquete* paquete = crear_paquete();
-    paquete->codigo_operacion = MENSAJE;
-    char* mensaje = "Hola, soy Query Control";
-    agregar_a_paquete(paquete, mensaje, strlen(mensaje) + 1);
+    paquete->codigo_operacion = SUBMIT_QUERY;;
+    agregar_a_paquete(paquete, path_query, strlen(path_query) + 1);
+    agregar_a_paquete(paquete, &prioridad, sizeof(int) + 1);
     enviar_paquete(paquete, conexion);
-    log_debug(loggerQueryControl, "Mensaje enviado al Master: %s", mensaje);
+
+    log_info(loggerQueryControl, "## Solicitud de ejecución de Query: %s, prioridad: %d",
+             path_query, prioridad);
+
+    escucharMaster(conexion);
+
     liberar_conexion(conexion);
     eliminar_paquete(paquete);
 
