@@ -258,7 +258,7 @@ Ofrece una serie de operaciones para que soliciten los Workers.
 
 Recibe:
 
-* `OP_CODE`: `CREATE_FILE`
+* `OP_CODE`: `OP_CREATE`
 * Nombre del File 
 * Nombre del TAG inicial 
 
@@ -281,10 +281,10 @@ Lo que debemos hacer:
 
 Es la que modifica el tamaño del archivo. Recibe:
 
-* `OP_CODE`: `TRUNCATE_FILE`
+* `OP_CODE`: `OP_TRUNCATE`
   * Propuesta:
-    * `TRUNCATE_FILE_ADD`
-    * `TRUNCATE_FILE_REDUCE`
+    * `OP_TRUNCATE_ADD`
+    * `OP_TRUNCATE_REDUCE`
 * Nombre del Archivo
 * Nombre del Tag
 * El tamaño
@@ -356,7 +356,7 @@ bool esHardlinkUnico(const char *path) {
 
 Recibimos:
 
-* `OP_CODE`: `FILE_TAG`.
+* `OP_CODE`: `OP_TAG`.
 * El nombre del Tag, para crearlo
 * El nombre del archivo, para saber a cual se refiere ??
 
@@ -371,7 +371,7 @@ Debemos:
 
 Recibimos:
 
-* `OP_CODE`: `COMMIT`.
+* `OP_CODE`: `OP_COMMIT`.
 * El nombre del File.
 * El nombre del Tag.
 
@@ -393,7 +393,7 @@ Debemos:
 
 Recibimos:
 
-* `OP_CODE`: `WRITE`.
+* `OP_CODE`: `OP_WRITE`.
 * El nombre del File.
 * El nombre del Tag.
 * El contenido que se desea escribir
@@ -416,7 +416,7 @@ Debemos:
 
 Recibimos:
 
-* `OP_CODE`: `READ`
+* `OP_CODE`: `OP_READ`
 * Nombre del File.
 * Nombre del Tag.
 * Número de bloque lógico.
@@ -434,7 +434,7 @@ Debemos:
 
 Recibimos:
 
-* `OP_CODE`: `DELETE`.
+* `OP_CODE`: `OP_DELETE`.
 * Nombre del File.
 * Nombre del Tag.
 
@@ -453,13 +453,16 @@ Detallan el problema que ocurrio en la ejecución de una operación. Como si fue
 
 Cada error se debe devolver al Worker, el cuál finalizará la Query.
 
-* File inexistente
+* `ERROR_FILE_NOT_FOUND`: File inexistente
   * No aplica a cuando creamos el File.
-* Tag Inexistente
+* `ERROR_TAG_NOT_FOUND`: Tag Inexistente
   * No aplica a cuando creamos el Tag.
-* Espacio insuficiente: Al buscar un bloque libre, no hay.
-* Escritura no permitida: Trata de escribir o truncar un File:Tag que se encuentra en estado `COMMITED`.
-* Lectura o escritura fuera de limite: Una lectura o escritura por fuera del tamaño File:Tag.
+* `ERROR_NO_SPACE`: Espacio insuficiente
+  * Al buscar un bloque libre, no hay.
+* `ERROR_WRITE_NOT_ALLOWED`: Escritura no permitida
+  * Trata de escribir o truncar un File:Tag que se encuentra en estado `COMMITED`.
+* `ERROR_OUT_OF_BOUNDS`: Lectura o escritura fuera de limite
+  * Una lectura o escritura por fuera del tamaño File:Tag.
 
 ## Retardo
 

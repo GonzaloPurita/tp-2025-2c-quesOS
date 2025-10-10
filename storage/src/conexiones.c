@@ -33,11 +33,12 @@ void recibirCliente(void* cliente) {
     int socket_cliente = *((int*) cliente);
     free(cliente);
 
-    t_list* datosRecibidos;
-    t_paquete* datosEnviados;
+    t_list* datosRecibidos = NULL;
+    t_paquete* datosEnviados = NULL;
 
     while(1) {
         op_code cod = recibir_operacion(socket_cliente);
+        log_debug(loggerStorage, "Operacion recibida: %d", cod);
         switch(cod) {
             case TAMANIO_BLOQUE: {
                 datosRecibidos = recibir_paquete(socket_cliente);
@@ -48,38 +49,77 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_CREATE: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_CREATE
                 break;
             }
-            case OP_TRUNCATE: {
-                // TODO: Implementar comportamiento para OP_TRUNCATE
+            case OP_TRUNCATE_ADD: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
+                // TODO: Implementar comportamiento para OP_TRUNCATE_ADD
                 break;
             }
+            case OP_TRUNCATE_REDUCE: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
+                // TODO: Implementar comportamiento para OP_TRUNCATE_REDUCE
+            }
             case OP_DELETE: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_DELETE
                 break;
             }
             case OP_TAG: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_TAG
                 break;
             }
             case OP_COMMIT: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_COMMIT
                 break;
             }
-            case PED_PAG: {
-                // TODO: Implementar comportamiento para PED_PAG
+            case OP_WRITE: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                agregar_a_paquete(datosEnviados, "Lei algo", 9);
+                enviar_paquete(datosEnviados, socket_cliente);
+                // TODO: Implementar comportamiento para OP_WRITE
                 break;
             }
-            case GUARDAR_MODIFICADAS: {
-                // TODO: Implementar comportamiento para GUARDAR_MODIFICADAS
+            case OP_READ: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
+                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
+                enviar_paquete(datosEnviados, socket_cliente);
+                // TODO: Implementar comportamiento para OP_READ
                 break;
             }
             default:
                 log_error(loggerStorage, "Operacion desconocida. No se puede atender al cliente.");
                 return;
         }
-        eliminar_paquete(datosEnviados);
+
+        if (datosEnviados != NULL) {
+            eliminar_paquete(datosEnviados);
+        }
     }
 }
 
