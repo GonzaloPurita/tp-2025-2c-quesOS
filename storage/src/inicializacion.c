@@ -15,7 +15,7 @@ void inicializarFS() {
         escribirBloqueInicial();
         cargarBitmap();
         inicializarBitmap();
-        bitarray_set_bit(bitmap, 0); // TODO: A chequear
+        bitarray_set_bit(bitmap, 0); 
         crearFileInicial();
     }
     else { // Tenemos que usar lo que ya tenemos

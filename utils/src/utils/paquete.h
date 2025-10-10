@@ -9,6 +9,16 @@
 
 typedef enum {
 	MENSAJE
+
+	// WORKER <---> STORAGE
+	TAMANIO_BLOQUE,
+	OP_CREATE,
+	OP_TRUNCATE,
+	OP_DELETE,
+	OP_TAG,
+	OP_COMMIT,
+	PED_PAG,
+	GUARDAR_MODIFICADAS
 }op_code;
 
 
