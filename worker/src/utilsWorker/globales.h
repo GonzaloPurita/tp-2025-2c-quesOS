@@ -21,8 +21,11 @@ extern t_log* loggerWorker;
 /* config global */
 extern t_config_worker* configWorker;
 
-/* otros externos ... */
+/* flags */
 extern atomic_int interrupt_flag;
+extern atomic_int query_error_flag;
+
+/* otros externos ... */
 extern t_query_context* query_actual;
 
 /* memoria */

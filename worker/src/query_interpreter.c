@@ -4,6 +4,7 @@
 t_query_context* query_actual;
 
 void recibir_queries(){
+    atomic_store(&query_error_flag, 0); // seteo la flag de error
 
     while(1){
         int cod_op = recibir_operacion(conexionMaster);
@@ -68,6 +69,12 @@ void ejercutar_query(char* path_query){
     while(getline(&linea, &len, file) != -1){
         // Solo ejecutamos si ya llegamos al PC_ACTUAL
         if (linea_actual >= PC_ACTUAL) {
+
+            if (atomic_load(&query_error_flag)) {
+                log_debug(loggerWorker, "## Query %d abortada por error del Storage", query_actual ? query_actual->query_id : -1);
+                break;
+            }
+
             log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
             // Simula retardo de memoria
@@ -201,6 +208,9 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "CREATE");
+
     log_info(loggerWorker,  "## Query %d: - Instrucción realizada: CREATE %s", query_actual->query_id, recurso);
 
     destruir_formato(formato);
@@ -221,7 +231,10 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s", query_actual->query_id, recurso);
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "TRUNCATE");
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
 
     destruir_formato(formato);
 }
@@ -243,6 +256,9 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "TAG");
+
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
 
     destruir_formato(formato_origen);
@@ -260,6 +276,9 @@ void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
 
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
+
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "DELETE");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
 
@@ -291,6 +310,9 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "COMMIT");
+
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
 
     destruir_formato(formato);
@@ -306,6 +328,10 @@ void ejecutar_end(t_instruccion* inst){
     agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     enviar_paquete(paquete, conexionMaster);
     eliminar_paquete(paquete);
+
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "END");
+
 
     // libero contexto
     destruir_query_context(query_actual);
@@ -339,7 +365,6 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
     t_paquete* respuesta = crear_paquete();
     respuesta->codigo_operacion = OP_READ;
     agregar_a_paquete(respuesta, contenido, strlen(contenido) + 1);
-
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);
 
@@ -405,6 +430,9 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
     }
     // flushea todas las páginas modificadas
     flush_paginas_modificadas_de_tabla(tabla, formato);
+
+    op_code rta = recibir_operacion(conexionStorage);
+    manejar_respuesta_storage(rta, "FLUSH");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
 
@@ -491,35 +519,62 @@ void guardar_paginas_modificadas() {
     log_debug(loggerWorker, "Finalizado guardado de páginas modificadas.");
 }
 
-// void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
-//     int base_pagina = nro_pagina * TAM_PAGINA;
+void manejar_respuesta_storage(op_code respuesta, char* operacion) {
+    char* motivo_error = NULL;
 
-//     t_paquete* paquete = crear_paquete();
-//     paquete->codigo_operacion = OP_READ;
-//     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
-//     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
-//     agregar_a_paquete(paquete, &base_pagina, sizeof(int));
-    
-//     enviar_paquete(paquete, conexionStorage);
-//     eliminar_paquete(paquete);
+    switch (respuesta) {
+        case OP_SUCCESS:
+            log_debug(loggerWorker, "[Storage] %s -> SUCCESS", operacion);
+            return;
+        case ERROR_FILE_NOT_FOUND:
+            motivo_error = "File no encontrado";
+            break;
+        case ERROR_TAG_NOT_FOUND:
+            motivo_error = "Tag no encontrado";
+            break;
+        case ERROR_NO_SPACE:
+            motivo_error = "Espacio insuficiente";
+            break;
+        case ERROR_WRITE_NOT_ALLOWED:
+            motivo_error = "Escritura no permitida";
+            break;
+        case ERROR_OUT_OF_BOUNDS:
+            motivo_error = "Lectura fuera de límites";
+            break;
+        default:
+            motivo_error = "Error desconocido";
+            break;
+    }
 
-//     // recibo la pagina
+    //le aviso al master que la query fallo
+    if (query_actual) notificar_error_a_master((char*)motivo_error);
 
-//     op_code cod_op = recibir_operacion(conexionStorage);
-//     if (cod_op == OP_READ) {
-//         t_list* lista = recibir_paquete(conexionStorage);
-//         char* contenido = list_get(lista, 0);
+    // marco error global para frenar ejecución
+    atomic_store(&query_error_flag, 1);
 
-//         escribir_en_memoria(formato, base_pagina, contenido); // TODO: guardar 'contenido' en MEMORIA en el marco asignado a la página nro_pagina, void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor)
-        
-//         log_debug(loggerWorker, "Contenido de página %d recibido desde Storage: %s", nro_pagina, contenido);
+    // liberar contexto y marcar error
+    if (query_actual) {
+        destruir_query_context(query_actual);
+        query_actual = NULL;
+    }
+}
 
-//         list_destroy_and_destroy_elements(lista, free);
-//     }
-// }
+void notificar_error_a_master(char* motivo) {
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = OP_ERROR;
+
+    // envio id query
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
+    // el motivo seria como un string
+    agregar_a_paquete(paquete, motivo, strlen(motivo) + 1);
+
+    enviar_paquete(paquete, conexionMaster);
+    eliminar_paquete(paquete);
+
+    log_error(loggerWorker, "## Query %d: finaliza con error -> %s", query_actual->query_id, motivo);
+}
 
 // --- Para liberar memoria --- //
-
 
 void destruir_instruccion(t_instruccion* inst) {
     for (int i = 0; i < inst->num_parametros; i++) {

@@ -21,8 +21,9 @@ t_list* paginas_necesarias(int direccion_base, int tamanio) {
 }
 
 bool esta_en_memoria(t_formato* formato, int nro_pagina) {
-    char* clave = string_itoa(nro_pagina);
-    tabla_pag* tabla = dictionary_get(diccionario_tablas, string_from_format("%s:%s", formato->file_name, formato->tag));
+    char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
+    tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_tabla);
+    free(clave_tabla);
 
     if (tabla == NULL) {
         free(clave);
@@ -135,7 +136,7 @@ int elegir_victima() {
 int elegir_victima_LRU() {
     int victima = 0;
 
-    for (int i = 1; i <= CANTIDAD_MARCOS; i++) { // no se si tiene que ser < o <=
+    for (int i = 1; i < CANTIDAD_MARCOS; i++) { // no se si tiene que ser < o <=
         if (frames[i].timestamp < frames[victima].timestamp) {
             frames[i].timestamp = obtener_timestamp();
             victima = i;

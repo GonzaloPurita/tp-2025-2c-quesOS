@@ -11,6 +11,8 @@ t_config_worker* configWorker;
 
 atomic_int interrupt_flag = ATOMIC_VAR_INIT(0);
 
+atomic_int query_error_flag = ATOMIC_VAR_INIT(0);
+
 // Datos globales
 int TAM_PAGINA;
 int TAM_MEMORIA;
