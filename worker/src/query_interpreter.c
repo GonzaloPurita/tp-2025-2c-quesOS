@@ -268,9 +268,21 @@ void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
 
 void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COMMIT MATERIAS:BASE
     char* recurso = inst->parametros[0];
-
     t_formato* formato = mapear_formato(recurso);
 
+    // antes del COMMIT, flush de las páginas modificadas !!
+    char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
+    tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_tabla);
+
+    if (tabla != NULL) {
+        flush_paginas_modificadas_de_tabla(tabla, formato);
+    } else {
+        log_warning(loggerWorker, "No existe tabla de páginas para %s:%s — no hay nada que commitear", formato->file_name, formato->tag);
+    }
+
+    free(clave_tabla);
+
+    //notifico al storage que se realizo el commit 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_COMMIT;
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
