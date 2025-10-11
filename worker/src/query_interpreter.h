@@ -50,6 +50,7 @@ void destruir_instruccion(t_instruccion* inst);
 t_formato* mapear_formato(char* recurso);
 void destruir_formato(t_formato* formato);
 void destruir_query_context(t_query_context* ctx);
+void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato);
 
 //ejecutar instrucciones
 void ejecutar_create(t_instruccion* inst);

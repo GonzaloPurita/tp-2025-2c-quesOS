@@ -43,7 +43,7 @@ void recibir_queries(){
             list_destroy_and_destroy_elements(paquete, free);
 
             if (atomic_load(&interrupt_flag)) {
-                guardar_paginas_modificadas(); // TODO: implementar
+                guardar_paginas_modificadas(); // esto seria como un flush 
                 notificar_master_desalojo(PC_ACTUAL);
                 atomic_store(&interrupt_flag, 0);
                 break;
@@ -233,7 +233,7 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
     t_formato* formato_origen = mapear_formato(recurso_origen);
     t_formato* formato_destino = mapear_formato(recurso_destino);
 
-    t_paquete* paquete = crear_paquete();
+    t_paquete* paquete = crear_paquete(); 
     paquete->codigo_operacion = OP_TAG;
     agregar_a_paquete(paquete, formato_origen->file_name, strlen(formato_origen->file_name) + 1);
     agregar_a_paquete(paquete, formato_origen->tag, strlen(formato_origen->tag) + 1);
@@ -379,7 +379,74 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
 void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
     char* recurso = inst->parametros[0];
-    //TODO
+    t_formato* formato = mapear_formato(recurso);
+
+    //busco en la tabla de paginas del file:tag
+    char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
+    tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_tabla);
+
+    if (tabla == NULL) {
+        log_warning(loggerWorker, "No existe tabla de páginas para %s:%s — no hay nada que flushear", formato->file_name, formato->tag);
+        free(clave_tabla);
+        destruir_formato(formato);
+        return;
+    }
+    // flushea todas las páginas modificadas
+    flush_paginas_modificadas_de_tabla(tabla, formato);
+
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+
+    free(clave_tabla);
+    destruir_formato(formato);
+}
+
+// envia todas las pags modificadas de la tabla 'tabla' para el file:tag 'formato'.
+void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
+    if (tabla == NULL || formato == NULL) return;
+
+    t_list* keys = dictionary_keys(tabla->paginas); // lista de strings con numeros de pagina
+    for (int i = 0; i < list_size(keys); i++) {
+        char* key = list_get(keys, i);
+        entrada_pag* entrada = dictionary_get(tabla->paginas, key);
+        if (entrada == NULL) continue;
+
+        if (entrada->presente && entrada->modificado) {
+            int nro_pagina = atoi(key);
+            int frame_index = entrada->indice_frame;
+            int dir_fisica = frame_index * TAM_PAGINA;
+
+            // Copio el contenido del marco
+            char* contenido = malloc(TAM_PAGINA);
+            memcpy(contenido, MEMORIA + dir_fisica, TAM_PAGINA);
+
+            // Armo paquete: usar GUARDAR_MODIFICADAS por bloque
+            t_paquete* paquete = crear_paquete();
+            paquete->codigo_operacion = GUARDAR_MODIFICADAS;
+            // ESTRUCTURA DEL PAQUETE: [nro_pagina(int), file_name, tag, contenido(TAM_PAGINA)]
+            agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
+            agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+            agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+            agregar_a_paquete(paquete, contenido, TAM_PAGINA);
+
+            enviar_paquete(paquete, conexionStorage);
+            eliminar_paquete(paquete);
+
+            // --- Opcional: esperar respuesta del Storage (recomendado si el mock lo implementa) ---
+            // int resp = recibir_operacion(conexionStorage);
+            // if (resp != RTA_OK) { log_error(...); /* manejar error */ }
+            // --------------------------------------------------------------------
+
+            // marco q no esta modificada la pag
+            entrada->modificado = false;
+            frames[frame_index].modificado = false;
+
+            log_debug(loggerWorker, "Página flusheada: %s:%s pagina=%d marco=%d", formato->file_name, formato->tag, nro_pagina, frame_index);
+
+            free(contenido);
+        }
+    }
+
+    list_destroy(keys);
 }
 
 void guardar_paginas_modificadas() {
@@ -416,7 +483,7 @@ void guardar_paginas_modificadas() {
 //     int base_pagina = nro_pagina * TAM_PAGINA;
 
 //     t_paquete* paquete = crear_paquete();
-//     paquete->codigo_operacion = PED_PAG;
+//     paquete->codigo_operacion = OP_READ;
 //     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
 //     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
 //     agregar_a_paquete(paquete, &base_pagina, sizeof(int));
@@ -427,7 +494,7 @@ void guardar_paginas_modificadas() {
 //     // recibo la pagina
 
 //     op_code cod_op = recibir_operacion(conexionStorage);
-//     if (cod_op == PED_PAG) {
+//     if (cod_op == OP_READ) {
 //         t_list* lista = recibir_paquete(conexionStorage);
 //         char* contenido = list_get(lista, 0);
 
