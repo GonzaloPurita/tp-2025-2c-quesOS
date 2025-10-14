@@ -37,17 +37,17 @@ void planificarConDesalojoYAging() {
       }
       else { // No hay una CPU libre --> Tengo que intentar desalojar.
         // Consigo el proceso con la menor prioridad
-        pthread_mutex_lock(&cola_exec);
+        pthread_mutex_lock(&mutex_cola_exec);
         t_query* candidatoDesalojo = buscarQueryConMenorPrioridad(); //TODO LA FUNCION
 
         if(candidatoDesalojo == NULL) { 
           workerLibre = obtenerWorkerLibre(); // Vuelvo a buscar un Worker libre
           if(workerLibre != NULL) { // Si había una CPU libre, no hay que desalojar.
-            pthread_mutex_lock(&cola_ready); // Bloqueo el mutex para la cola de READY
+            pthread_mutex_lock(&mutex_cola_ready); // Bloqueo el mutex para la cola de READY
             list_remove_element(cola_ready, query); // Elimino el nuevo proceso de la cola de READY
-            pthread_mutex_unlock(&cola_ready); // Desbloqueo el mutex
+            pthread_mutex_unlock(&mutex_cola_ready); // Desbloqueo el mutex
             list_add(cola_exec, query); // Agrego el proceso a la cola de EXEC
-            pthread_mutex_unlock(&cola_exec); // Desbloqueo el mutex
+            pthread_mutex_unlock(&mutex_cola_exec); // Desbloqueo el mutex
             actualizarMetricas(Q_READY, Q_EXEC, query);
             enviarQueryWorkerEspecifico(query, workerLibre); // Envio el proceso a esa CPU en particular.
           }
@@ -95,9 +95,9 @@ void planificarSinDesalojo() {
 void enviarQueryAWorker(t_query* query) {
     t_conexionWorker* conexionWorker = obtenerWorkerLibre(); // Obtengo un worker libre
     conexionWorker->// Le asigno el QID de la query a ejecutar.
-    enviarQCB // Envio el QCB a la CPU
+    enviarQCB // 
     pthread_t hiloWORKER;
-    pthread_create(&hiloWORKER, NULL, atender_worker, (void*) conexionWorker); // Creo un hilo para atender la CPU a la que le envio el PCB.
+    pthread_create(&hiloWORKER, NULL, atender_worker, (void*) conexionWorker); 
     pthread_detach(hiloWORKER);
 }
 
@@ -109,11 +109,26 @@ t_conexionWorker* obtenerWorkerLibre() {
 }
 
 void enviarProcesoWorkerEspecifico(t_query* query, t_conexionWorker* worker) {
-    worker->conectado = true; // La CPU ya no esta libre, porque le voy a enviar un proceso.
-    worker->qid_actual = query->QCB->QID; // Le asigno el PID del proceso que va a ejecutar.
-    enviarQCB(worker->fd, query->qcb); // Envio el PCB a la CPU
+    worker->conectado = true; 
+    worker->qid_actual = query->QCB->QID; 
+    enviarQCB(worker->fd, query->qcb); 
     pthread_t hiloWorker;
-    pthread_create(&hiloWorker, NULL, atender_worker, (void*) worker); // Creo un hilo para atender la CPU a la que le envio el PCB.
+    pthread_create(&hiloWorker, NULL, atender_worker, (void*) worker); 
     pthread_detach(hiloWorker); 
   }
+
+bool cmp_query_por_prioridad(void* _a, void* _b) {
+    t_query* a = (t_query*) _a;
+    t_query* b = (t_query*) _b;
+
+    if (a->prioridad_actual != b->prioridad_actual)
+        return a->prioridad_actual < b->prioridad_actual; // 0 es mejor
+    return a->ts_llegada < b->ts_llegada; // más vieja primero
+}
+
+void ordenar_ready(void) {
+    pthread_mutex_lock(&mutex_cola_ready);
+    list_sort(cola_ready, cmp_query_por_prioridad);
+    pthread_mutex_unlock(&mutex_cola_ready);
+}
 

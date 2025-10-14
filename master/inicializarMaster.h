@@ -1,5 +1,6 @@
-#include <utils/paquete.h>
 #include <t_conexionWorker.h>
+#include <utilsMaster/configMaster.h>
+#include <utils/paquete.h>
 
 void iniciarConexionesMaster(void);
 void cerrarConexionesMaster(void);

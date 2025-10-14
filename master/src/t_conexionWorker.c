@@ -26,7 +26,7 @@ void worker_registrar(int id, int fd) {
 
     pthread_mutex_lock(&mutex_workers);
     if(!LISTA_WORKERS){
-        workers_iniciar();
+        workers_iniciar()
     }
     list_add(LISTA_WORKERS, w);
     pthread_mutex_unlock(&mutex_workers);

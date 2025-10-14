@@ -81,34 +81,56 @@ void* atenderCliente(void* arg) {
         }
 
         case SUBMIT_QUERY: {
+            // Recibo la query: [ int prioridad ][ int len ][ char[len] path ]
             t_list* datos = recibir_paquete(fd);
-            if (list_size(datos) < 3) { /* log + close + return */ }
-
+            if (!datos || list_size(datos) < 3) {
+                log_error(loggerMaster, "fd=%d: SUBMIT_QUERY mal formado (items=%d)", fd, datos ? list_size(datos) : -1);
+                if (datos) list_destroy_and_destroy_elements(datos, free);
+                close(fd);
+                return NULL;
+            }
+            
+            // extraigo los datos del  paquete
             int prioridad = *(int*) list_get(datos, 0);
             int len       = *(int*) list_get(datos, 1);
-            char* path    = (char*) list_get(datos, 2);
-            char* path_dup = strndup(path, len);
+            char* path_in = (char*) list_get(datos, 2);
+
+            
+            char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
 
-            int qid;
+            // Genero QID
+            int qid = 0;
             pthread_mutex_lock(&mutex_qid);
             qid = NEXT_QID++;
             pthread_mutex_unlock(&mutex_qid);
 
+            // Creo la query
             t_query* q = crearQuery(path_dup, prioridad);
-            free(path_dup);
+            if (!q) {
+                log_error(loggerMaster, "No se pudo crear la query (prio=%d)", prioridad);
+                close(fd);
+                return NULL;
+            }
 
-            log_info(loggerMaster, "Query QID=%d recibida (prio=%d, path=%s)",
-                    qid, prioridad, path_dup);
+            q->QCB->qid = qid;
+            q->QCB->pc  = 0;
 
+            // Encolo en READY con prioridad estable 
+            agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar
+
+            log_info(loggerMaster, "QID=%d recibida (prio=%d, path=%s)", qid, q->prioridad /* o q->prioridad_actual */, q->path);
+
+            // ACK al Query_Control con el QID asignado
             t_paquete* r = crear_paquete();
             r->codigo_operacion = RTA_SUBMIT_QUERY;
             agregar_a_paquete(r, &qid, sizeof(int));
             enviar_paquete(r, fd);
             eliminar_paquete(r);
 
-            free(path_dup);
-            break;
+            // NO cerrar fd. Queda asociado a esta query para enviar los READ_RESULT / QUERY_FINISHED.
+            // Este hilo termina; otros hilos usarán q->QCB->fd_qc para escribirle al QC.
+            return NULL;
         }
 
         default:
