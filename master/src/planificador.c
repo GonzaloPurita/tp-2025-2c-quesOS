@@ -52,7 +52,7 @@ void planificarConDesalojoYAging() {
             enviarQueryWorkerEspecifico(query, workerLibre); // Envio el proceso a esa CPU en particular.
           }
           else {
-            log_error(loggerKernel, "No hay queries en EXEC, ni CPU libres");
+            log_error(loggerMaster, "No hay queries en EXEC, ni CPU libres");
             pthread_mutex_unlock(&cola_exec); // Desbloqueo el mutex
           }
         }
@@ -130,5 +130,75 @@ void ordenar_ready(void) {
     pthread_mutex_lock(&mutex_cola_ready);
     list_sort(cola_ready, cmp_query_por_prioridad);
     pthread_mutex_unlock(&mutex_cola_ready);
+}
+
+ChatGPT dijo:
+Pensado durante 28s
+
+Sí, comparar “a partir de la query que quiere entrar” tiene más sentido que coronar una reina del drama en EXEC y recién ahí mirar qué llega. Te lo dejo adaptado a tu estructura, sin inventos raros, con nombres decentes y sin mover estados antes de recibir el PC.
+
+Helpers mínimos
+// Devuelve true si EXISTE alguien en EXEC a quien valga la pena desalojar
+// para que entre una query con prioridad_nueva. Prioridad baja = mejor.
+// Si hay varias peores, elige la peor; en empate, la "más nueva" (última).
+static bool exec_encontrar_victima_para(int prioridad_nueva, t_query** out_victima, int* out_worker_id) {
+    bool hallado = false;
+    t_query* victima = NULL;
+    int worker_victima = -1;
+
+    pthread_mutex_lock(&mutex_cola_exec);
+    int n = list_size(cola_exec);
+    for (int i = 0; i < n; i++) {
+        t_query* q = list_get(cola_exec, i);
+        // Solo tiene sentido desalojar si la nueva es MEJOR (número menor) que la que está
+        if (prioridad_nueva < q->prioridad_actual) {
+            if (!hallado) {
+                victima = q;
+                worker_victima = worker_id_por_qid(q->QCB->qid); // tu helper existente
+                hallado = true;
+            } else {
+                // Elegir la PEOR prioridad (número mayor); empate: la última que veamos
+                if (q->prioridad_actual > victima->prioridad_actual) {
+                    victima = q;
+                    worker_victima = worker_id_por_qid(q->QCB->qid);
+                } else if (q->prioridad_actual == victima->prioridad_actual) {
+                    victima = q; // recorremos left→right; la última es la más "nueva" en EXEC
+                    worker_victima = worker_id_por_qid(q->QCB->qid);
+                }
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex_cola_exec);
+
+    if (hallado) {
+        *out_victima = victima;
+        *out_worker_id = worker_victima;
+    }
+    return hallado;
+}
+
+typedef struct { int worker_id; int qid; } t_preempt_args;
+
+void* hilo_enviar_preempt(void* arg) {
+    t_preempt_args* a = (t_preempt_args*) arg;
+    t_paquete* p = crear_paquete();
+    p->codigo_operacion = OP_PREEMPT;
+    agregar_a_paquete(p, &a->qid, sizeof(int));
+    int wfd = worker_fd(a->worker_id);
+    if (enviar_paquete(p, wfd) != 0) {
+        log_error(loggerMaster, "Worker %d: no se pudo enviar PREEMPT de QID=%d", a->worker_id, a->qid);
+    }
+    eliminar_paquete(p);
+    free(a);
+    return NULL;
+}
+
+void lanzar_preempt_async(int worker_id, int qid) {
+    t_preempt_args* a = malloc(sizeof(*a));
+    a->worker_id = worker_id;
+    a->qid = qid;
+    pthread_t th;
+    pthread_create(&th, NULL, hilo_enviar_preempt, a);
+    pthread_detach(th);
 }
 

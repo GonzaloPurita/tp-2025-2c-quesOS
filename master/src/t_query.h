@@ -13,6 +13,7 @@ typedef struct {
     int IDAging; // Se explica en la parte de AGING
     int prioridad_actual; // La que usa el scheduler y modifica el aging
     int pc_actual; // Para el desalojo
+    int fd_qc; // Flujo de comunicacion para reenviarle al QC
     estado_query estado; // OPCIONAL: Podemos guardar el estado en el que esta.
 }t_query;
 

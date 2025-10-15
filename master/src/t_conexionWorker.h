@@ -34,3 +34,4 @@ int  workers_disponibles(void);               // qid_actual == -1
 int  worker_id_por_fd(int fd);                // -1 si no existe
 
 void* atender_worker(void* arg);
+bool exec_buscar_por_qid(int qid, int* out_fd_qc);

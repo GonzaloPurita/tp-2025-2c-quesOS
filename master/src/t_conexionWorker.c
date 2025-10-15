@@ -106,6 +106,22 @@ void worker_eliminar_por_id(int id) {
     if (loggerMaster) log_warning(loggerMaster, "Se intentó eliminar Worker id=%d que no existe", id);
 }
 
+bool exec_buscar_por_qid(int qid, int* out_fd_qc) {
+    bool ok = false;
+    pthread_mutex_lock(&mutex_cola_exec);
+    int n = list_size(cola_exec);
+    for (int i = 0; i < n; i++) {
+        t_query* q = list_get(cola_exec, i);
+        if (q->QCB->qid == qid) {
+            *out_fd_qc = q->fd_qc;   
+            ok = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cola_exec);
+    return ok;
+}
+
 void* atenderWorker(void arg){
   t_conexionWorker* conexionWorker =  (t_conexionWorker*) arg; 
 
@@ -172,11 +188,40 @@ void* atenderWorker(void arg){
             memcpy(buf, list_get(p, 2), n);
             list_destroy_and_destroy_elements(p, free);
 
-            // TODO: forward de la lectura al QC de esa query (q->fd_qc)
-            // qc_forward_lectura(qid, buf, n);
+            // 1) Verificamos que el el QID esté en ejecución
+            int fd_qc = -1;
 
+            if (!exec_buscar_por_qid(qid, &fd_qc)) {
+                log_warning(loggerMaster, "Worker %d: READ para QID=%d no encontrada en EXEC", id, qid);
+                free(buf);
+                break;
+            }
+
+            // 2) Le mandamos el mensaje al Query_Control
+            t_paquete* out = crear_paquete();
+            out->codigo_operacion = MENSAJE_LECTURA;   // op code hacia el QC
+            agregar_a_paquete(out, &qid, sizeof(int));
+            agregar_a_paquete(out, &n,   sizeof(int));
+            agregar_a_paquete(out, buf,  n);
+
+            int rc = enviar_paquete(out, q->fd_qc);
+            eliminar_paquete(out);
             free(buf);
-            // El worker sigue ejecutando; no lo marcamos libre
+
+            if (rc != 0) {
+                // 3) El QC está caído -> La QUERY tiene que ir a EXIT
+                log_warning(loggerMaster, "QID=%d: QC desconectado durante READ. Se cancela la query.", qid);
+                close(q->fd_qc);
+                q->fd_qc = -1;
+
+                // Sacamos a la query de Exec pidiendo el desalojo
+                // el hilo atender_worker va a recibir el PC y como el fd_qc == -1, NO va a reencolar a READY, finaliza la query.
+                enviar_preempt_a_worker(id, qid);
+
+                // Importante: no mandamos a EXIT acá a la query. Esperamos el PC del worker para cerrar limpio
+                // y liberar el slot del worker (sem_post(&workers_disponibles) en ese handler).
+            }
+            // El worker sigue ejecutando; no se marca libre.
             break;
         }
 

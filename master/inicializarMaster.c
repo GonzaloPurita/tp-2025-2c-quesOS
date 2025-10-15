@@ -115,6 +115,7 @@ void* atenderCliente(void* arg) {
 
             q->QCB->qid = qid;
             q->QCB->pc  = 0;
+            q->fd_qc = fd;
 
             // Encolo en READY con prioridad estable 
             agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar
@@ -128,7 +129,7 @@ void* atenderCliente(void* arg) {
             enviar_paquete(r, fd);
             eliminar_paquete(r);
 
-            // NO cerrar fd. Queda asociado a esta query para enviar los READ_RESULT / QUERY_FINISHED.
+            // NO cerrar fd. Queda asociado a esta query para reenviar las operaciones de worker
             // Este hilo termina; otros hilos usarán q->QCB->fd_qc para escribirle al QC.
             return NULL;
         }
