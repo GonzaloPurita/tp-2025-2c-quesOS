@@ -31,8 +31,9 @@ void destruirQuery(t_query* q) {
 
 void actualizarMetricas(estado_query estadoActual, estado_query estadoNuevo, t_query* q) {
     // timestamps básicos y contadores útiles
-    if (estadoActual == Q_READY && estadoNuevo == Q_EXEC) q->ts_inicio_exec = now_ms();
-    if (estadoActual == Q_EXEC && estadoNuevo == Q_READY) { q->desalojos++; q->ts_ultimo_aging = now_ms(); }
+    if (estadoActual == Q_EXEC && estadoNuevo == Q_READY) {
+        q->IDAging = AGING_TICK_GLOBAL;  // no la envejezcas “al toque”
+    }
     q->estado = estadoNuevo;
 }
 
@@ -58,4 +59,48 @@ void agregarAReadyPorPrioridad(t_query* q){
              q->prioridad, q->prioridad_actual, i);
 
     sem_post(&hay_query_ready); // despertar planificador
+}
+
+//Cuestiones de AGING
+
+void* hilo_aging(void* arg) {
+    const int ms = configMaster->tiempo_aging_ms;
+    if (ms <= 0) return NULL;
+
+    for (;;) {
+        usleep(ms * 1000);
+        AGING_TICK_GLOBAL++;
+        aplicar_aging_ready();
+        // Puede haber cambiado quién es la mejor; despertá al planificador
+        sem_post(&hay_query_ready);
+    }
+    return NULL;
+}
+
+void aplicar_aging_ready(void) {
+    int hubo_cambios = 0;
+
+    pthread_mutex_lock(&mutex_cola_ready);
+
+    int n = list_size(cola_ready);
+    for (int i = 0; i < n; i++) {
+        t_query* q = list_get(cola_ready, i);
+
+        // Envejecer solo si todavía no se aplicó en este tick
+        if (q->prioridad_actual > 0 && q->IDAging < AGING_TICK_GLOBAL) {
+            int anterior = q->prioridad_actual;
+            q->prioridad_actual = anterior - 1; // 0 es mejor
+            q->IDAging = AGING_TICK_GLOBAL;
+            hubo_cambios = 1;
+            log_info(loggerMaster, "AGING QID=%d: %d -> %d",
+                     q->QCB->qid, anterior, q->prioridad_actual);
+        }
+    }
+
+    if (hubo_cambios) {
+        // Reordenar READY por prioridad actual (0 mejor). Sin inventos.
+        list_sort(cola_ready, cmp_ready_por_prioridad);
+    }
+
+    pthread_mutex_unlock(&mutex_cola_ready);
 }

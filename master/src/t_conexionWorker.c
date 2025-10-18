@@ -1,5 +1,7 @@
 #include <t_conexionWorker.h>
 
+
+
 void workers_iniciar(void) {
     LISTA_WORKERS = list_create();
 }
@@ -131,27 +133,40 @@ void* atenderWorker(void arg){
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
-            // payload: [qid:int][pc:int]
-            t_list* p = recibir_paquete(fd);
-            if (list_size(p) < 2) {
-                log_error(loggerMaster, "Worker %d: RTA_DESALOJO mal formado", id);
-                list_destroy_and_destroy_elements(p, free);
+            t_list* p = recibir_paquete(fd_worker);
+            if (!p || list_size(p) < 2) {
+                log_error(loggerMaster, "Worker %d: RTA_DESALOJO mal formado", worker->id);
+                if (p) list_destroy_and_destroy_elements(p, free);
                 break;
             }
             int qid = *(int*) list_get(p, 0);
             int pc  = *(int*) list_get(p, 1);
             list_destroy_and_destroy_elements(p, free);
 
-            // TODO: actualizar PC y reencolar a READY
-            // query_actualizar_pc(qid, pc);
-            // query_reencolar_ready(qid);
+            // 1) Actualizar PC en la query víctima (ya la movimos a READY en realizarDesalojo)
+            int actualizado = 0;
+            pthread_mutex_lock(&mutex_cola_ready);
+            for (int i = 0; i < list_size(cola_ready); i++) {
+                t_query* q = list_get(cola_ready, i);
+                if (q->QCB->qid == qid) {
+                    q->QCB->pc = pc;
+                    actualizado = 1;
+                    break;
+                }
+            }
+            pthread_mutex_unlock(&mutex_cola_ready);
 
-            worker_marcar_libre_por_fd(fd);
-            // TODO: avisar al planificador (cuando lo tengas)
-            log_info(loggerMaster, "## Query %d: desalojo confirmado por Worker %d (PC=%d)", qid, id, pc);
+            if (!actualizado) {
+                // Si no está en READY puede ser carrera rara: log y seguimos para no quedarnos colgados
+                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY para actualizar PC=%d", qid, pc);
+            } else {
+                log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
+            }
+
+            // 2) Despertar al hilo desalojar() para que envíe la nueva query
+            sem_post(&worker->semaforo);
             break;
         }
-
         case OP_END: {
             // payload: [qid:int][rc:int]   rc = código de retorno de la query
             t_list* p = recibir_paquete(fd);

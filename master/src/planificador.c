@@ -12,63 +12,66 @@ void* planificador(void* arg) {
 }
 
 void planificarConDesalojoYAging() {
-  while(1) {
-    sem_wait(&hay_query_ready); 
+  while (1) {
+    sem_wait(&hay_query_ready);
 
-    // Consigo el proceso con menor prioridad (se agregan a ready ordenados por prioridad)
-    pthread_mutex_lock(&cola_ready);
-    t_query* query = NULL;
-    if(!list_is_empty(cola_ready)) { 
-      query = list_get(cola_ready, 0);
-    }
-    pthread_mutex_unlock(&cola_ready);
+    pthread_mutex_lock(&mutex_cola_ready);
+    t_query* query = list_is_empty(cola_ready) ? NULL : list_get(cola_ready, 0);
+    pthread_mutex_unlock(&mutex_cola_ready);
 
-    if(query != NULL) { 
-      t_conexionWorker* workerLibre = obtenerWorkerLibre();
-      if(worker != NULL) { // -> NO hace falta desalojar
-        pthread_mutex_lock(&cola_ready); 
-        list_remove_element(cola_ready, query); 
-        pthread_mutex_unlock(&cola_ready); 
-        pthread_mutex_lock(&cola_exec); 
-        list_add(cola_exec, query); // Agrego la query a la cola de EXEC
-        pthread_mutex_unlock(&cola_exec); 
-        actualizarMetricas(Q_READY, Q_EXEC, query);
-        enviarQueryAWorkerEspecifico(query, workerLibre); 
-      }
-      else { // No hay una CPU libre --> Tengo que intentar desalojar.
-        // Consigo el proceso con la menor prioridad
+    if (query == NULL) continue;
+
+    t_conexionWorker* workerLibre = obtenerWorkerLibre();
+    if (workerLibre != NULL) {
+        pthread_mutex_lock(&mutex_cola_ready);
+        list_remove_element(cola_ready, query);
+        pthread_mutex_unlock(&mutex_cola_ready);
+
         pthread_mutex_lock(&mutex_cola_exec);
-        t_query* candidatoDesalojo = buscarQueryConMenorPrioridad(); //TODO LA FUNCION
+        list_add(cola_exec, query);
+        pthread_mutex_unlock(&mutex_cola_exec);
 
-        if(candidatoDesalojo == NULL) { 
-          workerLibre = obtenerWorkerLibre(); // Vuelvo a buscar un Worker libre
-          if(workerLibre != NULL) { // Si había una CPU libre, no hay que desalojar.
-            pthread_mutex_lock(&mutex_cola_ready); // Bloqueo el mutex para la cola de READY
-            list_remove_element(cola_ready, query); // Elimino el nuevo proceso de la cola de READY
-            pthread_mutex_unlock(&mutex_cola_ready); // Desbloqueo el mutex
-            list_add(cola_exec, query); // Agrego el proceso a la cola de EXEC
-            pthread_mutex_unlock(&mutex_cola_exec); // Desbloqueo el mutex
-            actualizarMetricas(Q_READY, Q_EXEC, query);
-            enviarQueryWorkerEspecifico(query, workerLibre); // Envio el proceso a esa CPU en particular.
-          }
-          else {
-            log_error(loggerMaster, "No hay queries en EXEC, ni CPU libres");
-            pthread_mutex_unlock(&cola_exec); // Desbloqueo el mutex
-          }
-        }
-        else { // Si encontre un proceso.
-          pthread_mutex_unlock(&cola_exec);
-          int64_t prioridadRestante = calcularPrioridadRestante(candidatoDesalojo); //TODO LA FUNCION
-          log_debug(loggerMaster,"Estoy comparando para desalojar: Nuevo con QID: %d con prioridad: %" PRId64" y en ejecución QID: %d con prioridad: %" PRId64,
-          query->QCB->PID, query->prioridad , candidatoDesalojo->QCB->PID, prioridadRestante);
-
-          if(nuevoProceso->prioridad > prioridadRestante) { // TENGO QUE DESALOJAR --> Es bloqueante --> Se hace en otro hilo
-            log_debug(loggerMaster, "Voy a desalojar");
-            realizarDesalojo(candidatoDesalojo, query); // Realizo el desalojo //TODO LA FUNCION
-          }
-        }
-      }
+        actualizarMetricas(Q_READY, Q_EXEC, query);
+        enviarQueryAWorkerEspecifico(query, workerLibre);
+        continue;
     }
+
+    // No hay worker libre: buscar víctima
+    t_query* candidatoDesalojo = buscarQueryConMenorPrioridad();
+    if (candidatoDesalojo == NULL) {
+        // reintento: tal vez entró un worker justo ahora
+        workerLibre = obtenerWorkerLibre();
+        if (workerLibre != NULL) {
+            pthread_mutex_lock(&mutex_cola_ready);
+            list_remove_element(cola_ready, query);
+            pthread_mutex_unlock(&mutex_cola_ready);
+
+            pthread_mutex_lock(&mutex_cola_exec);
+            list_add(cola_exec, query);
+            pthread_mutex_unlock(&mutex_cola_exec);
+
+            actualizarMetricas(Q_READY, Q_EXEC, query);
+            enviarQueryAWorkerEspecifico(query, workerLibre);
+        } else {
+            log_error(loggerMaster, "No hay queries en EXEC ni Workers libres");
+        }
+        continue;
+    }
+
+    int64_t prioridadVictima = calcularPrioridadRestante(candidatoDesalojo);
+    log_debug(loggerMaster,
+        "Comparo para desalojar: NUEVA QID=%d (p=%d) vs VICTIMA QID=%d (p=%" PRId64 ")",
+        query->QCB->qid, query->prioridad_actual,
+        candidatoDesalojo->QCB->qid, prioridadVictima);
+
+    pthread_mutex_unlock(&mutex_cola_exec);
+
+    // Prioridad más BAJA es MEJOR. Desalojar si la nueva es mejor que la víctima.
+    if (query->prioridad_actual < prioridadVictima) {
+        log_debug(loggerMaster, "Desalojo por prioridad");
+        realizarDesalojo(candidatoDesalojo, query);
+    }
+    // Si no es mejor, no hacemos nada y esperamos próximo evento (aging, worker libre, otra query).
   }
 }
 void planificarSinDesalojo() {
@@ -94,8 +97,16 @@ void planificarSinDesalojo() {
 
 void enviarQueryAWorker(t_query* query) {
     t_conexionWorker* conexionWorker = obtenerWorkerLibre(); // Obtengo un worker libre
-    conexionWorker->// Le asigno el QID de la query a ejecutar.
-    enviarQCB // 
+    conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
+    enviarQCB(conexionWorker ->fd, query ->QCB); // 
+    pthread_t hiloWORKER;
+    pthread_create(&hiloWORKER, NULL, atender_worker, (void*) conexionWorker); 
+    pthread_detach(hiloWORKER);
+}
+
+void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWorker) {
+    conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
+    enviarQCB(conexionWorker ->fd, query ->QCB); // 
     pthread_t hiloWORKER;
     pthread_create(&hiloWORKER, NULL, atender_worker, (void*) conexionWorker); 
     pthread_detach(hiloWORKER);
@@ -107,15 +118,6 @@ t_conexionWorker* obtenerWorkerLibre() {
     pthread_mutex_unlock(&mutex_workers);
     return conexionWorker;
 }
-
-void enviarProcesoWorkerEspecifico(t_query* query, t_conexionWorker* worker) {
-    worker->conectado = true; 
-    worker->qid_actual = query->QCB->QID; 
-    enviarQCB(worker->fd, query->qcb); 
-    pthread_t hiloWorker;
-    pthread_create(&hiloWorker, NULL, atender_worker, (void*) worker); 
-    pthread_detach(hiloWorker); 
-  }
 
 bool cmp_query_por_prioridad(void* _a, void* _b) {
     t_query* a = (t_query*) _a;
@@ -132,73 +134,92 @@ void ordenar_ready(void) {
     pthread_mutex_unlock(&mutex_cola_ready);
 }
 
-ChatGPT dijo:
-Pensado durante 28s
-
-Sí, comparar “a partir de la query que quiere entrar” tiene más sentido que coronar una reina del drama en EXEC y recién ahí mirar qué llega. Te lo dejo adaptado a tu estructura, sin inventos raros, con nombres decentes y sin mover estados antes de recibir el PC.
-
-Helpers mínimos
-// Devuelve true si EXISTE alguien en EXEC a quien valga la pena desalojar
-// para que entre una query con prioridad_nueva. Prioridad baja = mejor.
-// Si hay varias peores, elige la peor; en empate, la "más nueva" (última).
-static bool exec_encontrar_victima_para(int prioridad_nueva, t_query** out_victima, int* out_worker_id) {
-    bool hallado = false;
+t_query* buscarQueryConMenorPrioridad() {
     t_query* victima = NULL;
-    int worker_victima = -1;
 
     pthread_mutex_lock(&mutex_cola_exec);
     int n = list_size(cola_exec);
     for (int i = 0; i < n; i++) {
         t_query* q = list_get(cola_exec, i);
-        // Solo tiene sentido desalojar si la nueva es MEJOR (número menor) que la que está
-        if (prioridad_nueva < q->prioridad_actual) {
-            if (!hallado) {
-                victima = q;
-                worker_victima = worker_id_por_qid(q->QCB->qid); // tu helper existente
-                hallado = true;
-            } else {
-                // Elegir la PEOR prioridad (número mayor); empate: la última que veamos
-                if (q->prioridad_actual > victima->prioridad_actual) {
-                    victima = q;
-                    worker_victima = worker_id_por_qid(q->QCB->qid);
-                } else if (q->prioridad_actual == victima->prioridad_actual) {
-                    victima = q; // recorremos left→right; la última es la más "nueva" en EXEC
-                    worker_victima = worker_id_por_qid(q->QCB->qid);
-                }
-            }
+        if (victima == NULL || q->prioridad_actual > victima->prioridad_actual) {
+            victima = q;
+        } else if (victima && q->prioridad_actual == victima->prioridad_actual) {
+            // desempate consistente: desalojar la "más nueva" (la última que veamos)
+            victima = q;
         }
     }
     pthread_mutex_unlock(&mutex_cola_exec);
 
-    if (hallado) {
-        *out_victima = victima;
-        *out_worker_id = worker_victima;
-    }
-    return hallado;
+    return victima;
 }
 
-typedef struct { int worker_id; int qid; } t_preempt_args;
+// En prioridades no hay “restante”: usamos la prioridad_actual del candidato.
+int64_t calcularPrioridadRestante(t_query* candidatoDesalojo) {
+    return candidatoDesalojo->prioridad_actual;
+}
 
-void* hilo_enviar_preempt(void* arg) {
-    t_preempt_args* a = (t_preempt_args*) arg;
+void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
+    // 1) Logs y métricas
+    log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades",
+             candidatoDesalojo->QCB->qid);
+
+    // 2) Movemos a las queries de colas
+    pthread_mutex_lock(&mutex_cola_exec);
+    list_remove_element(cola_exec, candidatoDesalojo);
+    list_add(cola_exec, nuevoQuery);
+    pthread_mutex_unlock(&mutex_cola_exec);
+
+    pthread_mutex_lock(&mutex_cola_ready);
+    list_remove_element(cola_ready, nuevoQuery);
+    // reinsertar candidato en READY manteniendo orden por prioridad
+    agregarAReadyPorPrioridad(candidatoDesalojo);
+    pthread_mutex_unlock(&mutex_cola_ready);
+
+    actualizarMetricas(Q_EXEC, Q_READY, candidatoDesalojo);
+    actualizarMetricas(Q_READY, Q_EXEC, nuevoQuery);
+
+    // 3) Preparamos el hilo para hacer el desalojo
+    t_datos_desalojo* datos = malloc(sizeof(t_datos_desalojo));
+    datos->candidatoDesalojo = candidatoDesalojo;
+    datos->nuevoQuery = nuevoQuery;
+
+    // Encontrar el worker donde corre el candidato (igual que tu “encontrarCpuPorPid”)
+    datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->qid);
+    if (datos->worker == NULL) {
+        log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->qid);
+        free(datos);
+        return;
+    }
+
+    // 4) Lanzar hilo que hace el PREEMPT bloqueante
+    pthread_t hiloDesalojo;
+    pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
+    pthread_detach(hiloDesalojo);
+}
+
+void* desalojar(void* arg) {
+    t_datos_desalojo* d = (t_datos_desalojo*) arg;
+
+    // A) Pedir PREEMPT al worker del candidato
     t_paquete* p = crear_paquete();
-    p->codigo_operacion = OP_PREEMPT;
-    agregar_a_paquete(p, &a->qid, sizeof(int));
-    int wfd = worker_fd(a->worker_id);
-    if (enviar_paquete(p, wfd) != 0) {
-        log_error(loggerMaster, "Worker %d: no se pudo enviar PREEMPT de QID=%d", a->worker_id, a->qid);
+    p->codigo_operacion = DESALOJO;
+    agregar_a_paquete(p, &d->candidatoDesalojo->QCB->qid, sizeof(int));
+    if (enviar_paquete(p, d->worker->fd) != 0) {
+        log_error(loggerMaster, "Worker %d: fallo envío PREEMPT QID=%d",
+                  d->worker->id, d->candidatoDesalojo->QCB->qid);
+        eliminar_paquete(p);
+        free(d);
+        return NULL;
     }
     eliminar_paquete(p);
-    free(a);
-    return NULL;
-}
 
-void lanzar_preempt_async(int worker_id, int qid) {
-    t_preempt_args* a = malloc(sizeof(*a));
-    a->worker_id = worker_id;
-    a->qid = qid;
-    pthread_t th;
-    pthread_create(&th, NULL, hilo_enviar_preempt, a);
-    pthread_detach(th);
+   // B) Esperar RTA_DESALOJO: el hilo atender_worker hará sem_post(&worker->semaforo)
+    sem_wait(&d->worker->semaforo);
+
+    // C) Enviar la NUEVA query a ese mismo worker
+    enviarQueryAWorkerEspecifico(d->nuevoQuery, d->worker);
+
+    free(d);
+    return NULL;
 }
 

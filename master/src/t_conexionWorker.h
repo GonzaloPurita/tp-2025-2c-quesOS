@@ -11,6 +11,8 @@ t_list* LISTA_WORKERS = NULL;           // definición (no extern)
 
 extern t_list* LISTA_WORKERS;
 
+extern uint64_t AGING_TICK_GLOBAL = 0;
+
 typedef struct {
     int  id;
     int  fd;
@@ -35,3 +37,4 @@ int  worker_id_por_fd(int fd);                // -1 si no existe
 
 void* atender_worker(void* arg);
 bool exec_buscar_por_qid(int qid, int* out_fd_qc);
+

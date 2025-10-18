@@ -37,6 +37,7 @@ void* recibirConexiones(void* arg) {
     return NULL;
 }
 
+
 void* atenderCliente(void* arg) {
     int fd = *((int*) arg);
     free(arg);
@@ -58,6 +59,11 @@ void* atenderCliente(void* arg) {
             list_destroy_and_destroy_elements(datos, free);
 
             worker_registrar(worker_id, fd);
+            if (configMaster->tiempo_aging_ms > 0) {
+                pthread_t th_aging;
+                pthread_create(&th_aging, NULL, hilo_aging, NULL);
+                pthread_detach(th_aging);
+            }
 
             // ACK y a otra cosa
             int ok = 1;
@@ -89,12 +95,19 @@ void* atenderCliente(void* arg) {
                 close(fd);
                 return NULL;
             }
-            
-            // extraigo los datos del  paquete
-            int prioridad = *(int*) list_get(datos, 0);
-            int len       = *(int*) list_get(datos, 1);
-            char* path_in = (char*) list_get(datos, 2);
+            void* hilo_aging(void* arg) {
+    const int ms = configMaster->tiempo_aging_ms;
+    if (ms <= 0) return NULL;
 
+    for (;;) {
+        usleep(ms * 1000);
+        AGING_TICK_GLOBAL++;
+        aplicar_aging_ready();
+        // Puede haber cambiado quién es la mejor; despertá al planificador
+        sem_post(&hay_query_ready);
+    }
+    return NULL;
+}
             
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
@@ -117,8 +130,16 @@ void* atenderCliente(void* arg) {
             q->QCB->pc  = 0;
             q->fd_qc = fd;
 
-            // Encolo en READY con prioridad estable 
-            agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar
+            if(configMaster -> algoritmo_planificacion == "FIFO"){
+                mutex_lock(&mutex_cola_ready);
+                list_add(cola_ready, q);
+                mutex_unlock(&mutex_cola_ready);
+                sem_post(&hay_query_ready)
+            }
+            else{
+                agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar
+            }
+            
 
             log_info(loggerMaster, "QID=%d recibida (prio=%d, path=%s)", qid, q->prioridad /* o q->prioridad_actual */, q->path);
 

@@ -23,3 +23,8 @@ void destruirQuery(t_query* q);
 extern t_list* cola_ready;
 extern t_list*  cola_exec;
 extern t_list*  cola_exit;
+
+//AGING
+
+void* hilo_aging(void* arg);
+void aplicar_aging_ready(void);
