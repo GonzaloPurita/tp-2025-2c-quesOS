@@ -88,4 +88,27 @@ void cargarBitmap();
  */
 bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico);
 
+/**
+ * @brief Obtiene un bloque físico libre y lo marca como usado en el bitmap.
+ * 
+ * @return El número del bloque físico libre, o -1 si no hay bloques libres disponibles.
+ */
+int obtenerBloqueLibre();
+
+/**
+ * @brief Cuenta la cantidad de hardlinks asociados a un archivo.
+ * 
+ * @param path Ruta del archivo cuyo número de hardlinks se desea contar.
+ * @return El número de hardlinks, o -1 en caso de error.
+ */
+int contarHardlinks(const char *path);
+
+/**
+ * @brief Verifica si un archivo tiene un único hardlink.
+ * 
+ * @param path Ruta del archivo a verificar.
+ * @return true si el archivo tiene un único hardlink, false en caso contrario o error.
+ */
+bool esHardlinkUnico(const char *path);
+
 #endif /* _BLOQUES_H_ */

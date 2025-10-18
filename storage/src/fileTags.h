@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include "utilsStorage/bloques.h"
+#include <utils/paquete.h>
 
 // bool existeFileTag(char* nombreFile, char* nombreTag); Va a haber que implementarlo.
 
@@ -13,7 +14,7 @@
  * @param nombreTag Nombre de la etiqueta asociada al fileTag.
  * @return true si el fileTag se creó exitosamente, false en caso contrario.
  */
-bool crearFileTag(char* nombreFile, char* nombreTag);
+op_code crearFileTag(char* nombreFile, char* nombreTag);
 
 /**
  * @brief Obtiene la ruta completa de un fileTag dado el nombre del archivo y la etiqueta.
@@ -51,5 +52,24 @@ bool crearFileInicial();
  * @return true si el bloque se agregó exitosamente, false en caso contrario.
  */
 bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico);
+
+/**
+ * @brief Obtiene la metadata de un fileTag específico.
+ * 
+ * @param file Nombre del archivo asociado al fileTag.
+ * @param tag Nombre de la etiqueta asociada al fileTag.
+ * @return Un puntero a la estructura t_config que contiene la metadata del fileTag.
+ */
+t_config* getMetaData(char* file, char* tag);
+
+/**
+ * @brief Obtiene el número de bloque físico asociado a un bloque lógico específico de un fileTag.
+ * 
+ * @param file Nombre del archivo asociado al fileTag.
+ * @param tag Nombre de la etiqueta asociada al fileTag.
+ * @param numeroBloqueLogico Número del bloque lógico cuyo bloque físico se desea obtener.
+ * @return El número del bloque físico asociado al bloque lógico, o -1 en caso de error.
+ */
+int obtenerBloqueFisico(char* file, char* tag, int numeroBloqueLogico);
 
 #endif /* _FILETAGS_H */

@@ -2,6 +2,8 @@
 
 // Funciones privadas
 bool crearMetaData(char* path);
+void eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico);
+void free_wrapper(char* line);
 
 bool crearFileInicial() {
     if (!crearFileTag("initial_file", "BASE")) {
@@ -17,15 +19,15 @@ bool crearFileInicial() {
     return true;
 }
 
-bool crearFileTag(char* nombreFile, char* nombreTag) {
+op_code crearFileTag(char* nombreFile, char* nombreTag) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
         log_error(loggerStorage, "Error creando file tag, el nombre del file o del tag es NULL");
-        return false;
+        return OP_FAILED;
     }
     if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
         log_error(loggerStorage, "Error creando file tag, el nombre del file o del tag está vacío");
-        return false;
+        return OP_FAILED;
     }
 
     // Creamos la ruta files
@@ -33,7 +35,7 @@ bool crearFileTag(char* nombreFile, char* nombreTag) {
     string_append(&rutaFile, nombreFile);
     if(crearDirectorio(rutaFile) == -1) { // Me genera la carpeta con el nombre del file.
         free(rutaFile);
-        return false;
+        return OP_FAILED;
     }
 
     // Creamos la ruta tag
@@ -41,24 +43,24 @@ bool crearFileTag(char* nombreFile, char* nombreTag) {
     string_append(&rutaFile, nombreTag);
     if(crearDirectorio(rutaFile) == -1) { // Me genera la carpeta con el nombre del tag.
         free(rutaFile);
-        return false;
+        return OP_FAILED;
     }
 
     // Creo el metadata.config para el tag
     if(!crearMetaData(rutaFile)) { 
         free(rutaFile);
-        return false;
+        return OP_FAILED;
     }
 
     // Creamos la ruta logical_blocks
     string_append(&rutaFile, "/logical_blocks");
     if(crearDirectorio(rutaFile) == -1) { // Me genera la carpeta logical_blocks.
         free(rutaFile);
-        return false;
+        return OP_FAILED;
     }
 
     free(rutaFile);
-    return true;
+    return OP_SUCCESS;
 }
 
 bool crearMetaData(char* path) {
@@ -150,7 +152,124 @@ bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLo
     return true;
 }
 
+void eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico) {
+    // Validación de datos
+    if (nombreFile == NULL || nombreTag == NULL) {
+        log_error(loggerStorage, "Error eliminando bloque lógico, el nombre del file o del tag es NULL");
+        return;
+    }
+    if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
+        log_error(loggerStorage, "Error eliminando bloque lógico, el nombre del file o del tag está vacío");
+        return;
+    }
+    if (numeroBloqueLogico < 0) {
+        log_error(loggerStorage, "Error eliminando bloque lógico, el número de bloque lógico es negativo");
+        return;
+    }
+
+    // Creo la ruta completa a donde va el bloque lógico
+    char* rutaBloqueLogico = rutaCompleta("/files/");
+    string_append(&rutaBloqueLogico, nombreFile);
+    string_append(&rutaBloqueLogico, "/");
+    string_append(&rutaBloqueLogico, nombreTag);
+    string_append(&rutaBloqueLogico, "/logical_blocks/");
+
+    int bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
+    if(bloqueFisico == -1) {
+        free(rutaBloqueLogico);
+        return;
+    }
+
+    eliminarHardlink(rutaBloqueLogico, numeroBloqueLogico, bloqueFisico);
+
+    free(rutaBloqueLogico);
+}
+
+void eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico) {
+    // Genero la ruta para el bloque lógico
+    char* rutaBloqueLogicoTemp = string_duplicate(rutaBloqueLogico); // El append modifica el puntero, por eso hago una copia
+    char* nombre = crearNombreBloque(numeroBloqueLogico);
+    string_append(&rutaBloqueLogicoTemp, nombre);
+    free(nombre);
+    unlink(rutaBloqueLogicoTemp); // Esto elimina el hard link
+
+    if(esHardlinkUnico(rutaBloqueLogicoTemp) && (bloqueFisico != 0))
+        bitarray_clean_bit(bitmap, bloqueFisico); // Marco el bloque físico como libre        
+
+    free(rutaBloqueLogicoTemp);
+}
+
+int obtenerBloqueFisico(char* file, char* tag, int numeroBloqueLogico) {
+    // Obtener metadata del File:Tag
+    t_config* metadata = getMetaData(file, tag);
+    if (metadata == NULL) {
+        log_error(loggerStorage, "No se pudo obtener el metadata para %s:%s", file, tag);
+        return -1;
+    }
+
+    // Obtener la lista de bloques físicos
+    char** bloques = config_get_array_value(metadata, "BLOQUES");
+    if (bloques == NULL) {
+        log_error(loggerStorage, "No se pudo obtener la lista de bloques físicos para %s:%s", file, tag);
+        config_destroy(metadata);
+        return -1;
+    }
+
+    // Verificar si el bloque lógico tiene un bloque físico asociado
+    char* bloqueFisicoStr = bloques[numeroBloqueLogico];
+    if (bloqueFisicoStr == NULL) {
+        log_error(loggerStorage, "El bloque lógico %d no tiene un bloque físico asociado en %s:%s", numeroBloqueLogico, file, tag);
+        
+        string_iterate_lines(bloques, free_wrapper);
+        free(bloques);
+        config_destroy(metadata);
+        return -1;
+    }
+
+    int numeroBloqueFisico = atoi(bloqueFisicoStr);
+
+    // Liberar memoria
+    string_iterate_lines(bloques, free_wrapper);
+    free(bloques);
+    config_destroy(metadata);
+
+    return numeroBloqueFisico;
+}
+
+void free_wrapper(char* line) {
+    free(line);
+}
+
 // Funciones genéricas de metadata
+
+t_config* getMetaData(char* file, char* tag) {
+    // Validación de datos
+    if (file == NULL || tag == NULL) {
+        log_error(loggerStorage, "Error obteniendo metadata, el nombre del file o del tag es NULL");
+        return NULL;
+    }
+    if (string_is_empty(file) || string_is_empty(tag)) {
+        log_error(loggerStorage, "Error obteniendo metadata, el nombre del file o del tag está vacío");
+        return NULL;
+    }
+
+    char* ruta = rutaFileTag(file, tag);
+    if(ruta == NULL) {
+        return NULL;
+    }
+
+    string_append(&ruta, "/metadata.config"); // Tendria algo como ruta_montaje/files/file1//tag1/metadata.config
+
+    t_config* metadata = config_create(ruta);
+    if (metadata == NULL) {
+        log_error(loggerStorage, "Error obteniendo metadata, no se pudo abrir el archivo metadata.config en la ruta %s", ruta);
+        free(ruta);
+        return NULL;
+    }
+
+    free(ruta);
+    return metadata;
+}
 
 bool cambiarEstadoMetaData(char* file, char* tag, t_estado_fileTag estadoNuevo) {
     // Validación de datos

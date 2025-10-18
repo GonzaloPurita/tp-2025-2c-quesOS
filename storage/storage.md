@@ -3,7 +3,7 @@
 Este módulo representa un File System (FS) en el cual los workers pueden operar de forma **concurrente**.
 
 - [Storage](#storage)
-  - [Inicialización](#inicialización)
+  - [Inicialización](#s)
     - [Estructura de directorios y archivos](#estructura-de-directorios-y-archivos)
       - [Archivo `superblock.config`](#archivo-superblockconfig)
       - [Archivo `bitmap.bin`](#archivo-bitmapbin)
@@ -296,7 +296,6 @@ Es la que modifica el tamaño del archivo. Recibe:
 1) Recibimos el tamaño que queremos incrementar.
 2) Determinamos cuantos bloques **nuevos** debemos asignar.
    1) Nuestro archivo tiene un tamaño `x` y nos piden incrementarlo en `y` lo que nos da el tamaño `total`. Cuando tenemos el `total` tenemos que volver a calcular la cantidad de bloques que necesita y en base a la diferencia con los que tiene sabemos cuantos nuevos hay que asignar.
-   2) Con el `bitmap` sabemos si hay bloques libres
 3) Le asignamos los bloques lógicos que necesite (hard links), todos apuntan al bloque físico 0.
 
 #### Reducir el tamaño

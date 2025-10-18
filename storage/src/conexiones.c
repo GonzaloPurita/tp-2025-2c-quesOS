@@ -50,26 +50,17 @@ void recibirCliente(void* cliente) {
             }
             case OP_CREATE: {
                 datosRecibidos = recibir_paquete(socket_cliente);
+                crearFile(datosRecibidos, socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_CREATE
                 break;
             }
-            case OP_TRUNCATE_ADD: {
+            case OP_TRUNCATE: {
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
                 enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_TRUNCATE_ADD
                 break;
-            }
-            case OP_TRUNCATE_REDUCE: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_TRUNCATE_REDUCE
             }
             case OP_DELETE: {
                 datosRecibidos = recibir_paquete(socket_cliente);

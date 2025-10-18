@@ -193,3 +193,36 @@ bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBlo
     return true;
 }
 
+int obtenerBloqueLibre() {
+    for (int i = 0; i < superblock->nroBloques; i++) {
+        if (!bitarray_test_bit(bitmap, i)) { // Si el bit está en 0, está libre
+            bitarray_set_bit(bitmap, i); // Marco el bloque como usado
+            return i;
+        }
+    }
+    log_warning(loggerStorage, "No hay bloques físicos libres disponibles");
+    return -1; // No hay bloques libres
+}
+
+int contarHardlinks(const char *path) {
+    struct stat file_stat;
+    
+    if (stat(path, &file_stat) == -1) {
+        perror("stat");
+        return -1;
+    }
+    
+    return file_stat.st_nlink;
+}
+
+bool esHardlinkUnico(const char *path) {
+    struct stat file_stat;
+    
+    if (stat(path, &file_stat) == -1) {
+        perror("stat");
+        return -1;
+    }
+    
+    // Si st_nlink == 1, solo existe este enlace
+    return (file_stat.st_nlink == 1);
+}
