@@ -1,5 +1,7 @@
 #include "t_query.h"
 
+uint64_t AGING_TICK_GLOBAL = 0;
+
 t_query* crearQuery(const char* path, int prioridad) {
     pthread_mutex_lock(&mutex_queries);
 
@@ -80,8 +82,6 @@ void* hilo_aging(void* arg) {
         usleep(ms * 1000);
         AGING_TICK_GLOBAL++;
         aplicar_aging_ready();
-        // Puede haber cambiado quién es la mejor; despertá al planificador
-        sem_post(&hay_query_ready);
     }
     return NULL;
 }

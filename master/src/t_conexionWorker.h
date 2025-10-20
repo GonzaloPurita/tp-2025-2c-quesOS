@@ -6,14 +6,13 @@
 #include <unistd.h> 
 #include <commons/collections/list.h> 
 #include <stdbool.h> 
-#include <commons/collections/list.h> 
 #include <utilsMaster/configMaster.h> 
 #include <utils/paquete.h>
+#include <t_query.h>
 
 
-extern t_list* LISTA_WORKERS = NULL;
+extern t_list* LISTA_WORKERS;
 
-extern uint64_t AGING_TICK_GLOBAL = 0;
 
 typedef struct {
     int  id;
@@ -28,6 +27,7 @@ void workers_iniciar(void);
 
 // Altas/bajas
 void worker_registrar(int id, int fd);
+void worker_desconectar_por_fd(int fd);
 
 // Estado de ejecución
 

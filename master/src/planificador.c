@@ -72,7 +72,7 @@ void planificarConDesalojoYAging() {
 void planificarSinDesalojo() {
   while(1) {
     sem_wait(&hay_query_ready); 
-    sem_wait(&workers_disponibles); 
+    sem_wait(&sem_workers_disponibles); 
 
     // Saco la primer query de la cola de READY
     pthread_mutex_lock(&mutex_cola_ready); 

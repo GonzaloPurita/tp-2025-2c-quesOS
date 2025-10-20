@@ -81,6 +81,10 @@ void* atenderCliente(void* arg) {
             pthread_create(&th, NULL, atender_worker, fd_ptr);
             pthread_detach(th);
 
+            worker_marcar_libre_por_fd(fd);
+            sem_post(&sem_workers_disponibles);
+
+
             return NULL; // Lanzo un NULL porque el hilo de atender_worker se encarga de cerrar el fd
 
 

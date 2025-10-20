@@ -7,6 +7,7 @@
 #include <utils/qcb.h>
 
 typedef enum { Q_READY, Q_EXEC, Q_EXIT } estado_query;
+
 extern uint64_t AGING_TICK_GLOBAL;
 
 typedef struct {
