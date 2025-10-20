@@ -4,6 +4,7 @@
 bool crearMetaData(char* path);
 bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico);
 void free_wrapper(char* line);
+op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag);
 
 bool crearFileInicial() {
     if (!crearFileTag("initial_file", "BASE")) {
@@ -33,34 +34,41 @@ op_code crearFileTag(char* nombreFile, char* nombreTag) {
     // Creamos la ruta files
     char* rutaFile = rutaCompleta("/files/");
     string_append(&rutaFile, nombreFile);
-    if(crearDirectorio(rutaFile) == -1) { // Me genera la carpeta con el nombre del file.
+    if (crearDirectorio(rutaFile) == -1) { // Me genera la carpeta con el nombre del file.
         free(rutaFile);
         return OP_FAILED;
     }
 
-    // Creamos la ruta tag
-    string_append(&rutaFile, "/");
-    string_append(&rutaFile, nombreTag);
-    if(crearDirectorio(rutaFile) == -1) { // Me genera la carpeta con el nombre del tag.
-        free(rutaFile);
-        return OP_FAILED;
-    }
-
-    // Creo el metadata.config para el tag
-    if(!crearMetaData(rutaFile)) { 
-        free(rutaFile);
-        return OP_FAILED;
-    }
-
-    // Creamos la ruta logical_blocks
-    string_append(&rutaFile, "/logical_blocks");
-    if(crearDirectorio(rutaFile) == -1) { // Me genera la carpeta logical_blocks.
-        free(rutaFile);
-        return OP_FAILED;
-    }
-
+    // Crear directorio y metadata para el tag
+    op_code resultado = crearDirectorioYMetaData(rutaFile, nombreTag);
     free(rutaFile);
-    return OP_SUCCESS;
+    return resultado;
+}
+
+op_code crearTag(char* nombreFile, char* nombreTag) {
+    // Validación de datos
+    if (nombreFile == NULL || nombreTag == NULL) {
+        log_error(loggerStorage, "Error creando tag, el nombre del file o del tag es NULL");
+        return OP_FAILED;
+    }
+    if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
+        log_error(loggerStorage, "Error creando tag, el nombre del file o del tag está vacío");
+        return OP_FAILED;
+    }
+
+    // Verifico que el File exista
+    char* rutaFile = rutaCompleta("/files/");
+    string_append(&rutaFile, nombreFile);
+    if (!directorioExiste(rutaFile)) {
+        log_error(loggerStorage, "Error creando tag, el file %s no existe", nombreFile);
+        free(rutaFile);
+        return ERROR_FILE_NOT_FOUND;
+    }
+
+    // Crear directorio y metadata para el tag
+    op_code resultado = crearDirectorioYMetaData(rutaFile, nombreTag);
+    free(rutaFile);
+    return resultado;
 }
 
 bool crearMetaData(char* path) {
@@ -319,4 +327,26 @@ bool cambiarEstadoMetaData(char* file, char* tag, t_estado_fileTag estadoNuevo) 
     config_destroy(metadata);
     free(ruta);
     return true;
+}
+
+op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag) {
+    // Creamos la ruta tag
+    string_append(&rutaBase, "/");
+    string_append(&rutaBase, nombreTag);
+    if (crearDirectorio(rutaBase) == -1) { // Me genera la carpeta con el nombre del tag.
+        return OP_FAILED;
+    }
+
+    // Creo el metadata.config para el tag
+    if (!crearMetaData(rutaBase)) {
+        return OP_FAILED;
+    }
+
+    // Creamos la ruta logical_blocks
+    string_append(&rutaBase, "/logical_blocks");
+    if (crearDirectorio(rutaBase) == -1) { // Me genera la carpeta logical_blocks.
+        return OP_FAILED;
+    }
+
+    return OP_SUCCESS;
 }

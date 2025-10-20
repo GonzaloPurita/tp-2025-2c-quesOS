@@ -10,11 +10,28 @@
 /**
  * @brief Crea un nuevo fileTag con el nombre de archivo y nombre de etiqueta especificados.
  * 
- * @param nombreFile Nombre del archivo asociado al fileTag.
- * @param nombreTag Nombre de la etiqueta asociada al fileTag.
- * @return true si el fileTag se creó exitosamente, false en caso contrario.
+ * Esta función asocia un archivo con una etiqueta específica, creando un fileTag.
+ * 
+ * @param nombreFile Nombre del archivo al que se asociará la etiqueta.
+ * @param nombreTag Nombre de la etiqueta que se asociará al archivo.
+ * @return op_code Código de operación que indica el resultado:
+ *         - true: Si el fileTag se creó exitosamente.
+ *         - false: En caso de error durante la creación.
  */
 op_code crearFileTag(char* nombreFile, char* nombreTag);
+
+/**
+ * @brief Crea una nueva etiqueta asociada a un archivo.
+ * 
+ * Esta función permite agregar una etiqueta a un archivo existente.
+ * 
+ * @param nombreFile Nombre del archivo al que se asociará la nueva etiqueta.
+ * @param nombreTag Nombre de la etiqueta que se desea crear y asociar.
+ * @return op_code Código de operación que indica el resultado:
+ *         - true: Si la etiqueta se creó exitosamente.
+ *         - false: En caso de error durante la creación.
+ */
+op_code crearTag(char* nombreFile, char* nombreTag);
 
 /**
  * @brief Obtiene la ruta completa de un fileTag dado el nombre del archivo y la etiqueta.

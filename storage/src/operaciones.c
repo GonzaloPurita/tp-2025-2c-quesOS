@@ -48,6 +48,15 @@ void truncar(t_list* data, int socket_cliente) {
     config_destroy(metadata);
 }
 
+void tag(t_list* data, int socket_cliente) {
+    char* nombreFile = list_get(data, 0);
+    char* nombreTag = list_get(data, 1);
+    op_code resultado = crearTag(nombreFile, nombreTag);
+    enviarRespueta(resultado, socket_cliente);
+}
+
+
+
 // Privados - Implementaciones
 void enviarRespueta(op_code codigo, int socket_cliente) {
     t_paquete* paqueteRespuesta = crear_paquete();

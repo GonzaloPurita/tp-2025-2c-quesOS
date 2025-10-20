@@ -56,10 +56,14 @@ void recibirCliente(void* cliente) {
             }
             case OP_TRUNCATE: {
                 datosRecibidos = recibir_paquete(socket_cliente);
+                truncar(datosRecibidos, socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_TRUNCATE_ADD
+                break;
+            }
+            case OP_TAG: {
+                datosRecibidos = recibir_paquete(socket_cliente);
+                tag(datosRecibidos, socket_cliente);
+                list_destroy_and_destroy_elements(datosRecibidos, free);
                 break;
             }
             case OP_DELETE: {
@@ -68,14 +72,6 @@ void recibirCliente(void* cliente) {
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
                 enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_DELETE
-                break;
-            }
-            case OP_TAG: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_TAG
                 break;
             }
             case OP_COMMIT: {
