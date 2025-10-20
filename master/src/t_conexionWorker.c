@@ -25,6 +25,7 @@ void worker_registrar(int id, int fd) {
     w->fd = fd;
     w->conectado = true;
     w->qid_actual = -1;
+    w->semaforo = sem_init(w->semaforo);
 
     pthread_mutex_lock(&mutex_workers);
     if(!LISTA_WORKERS){
@@ -35,22 +36,6 @@ void worker_registrar(int id, int fd) {
 
     if (loggerMaster) log_info(loggerMaster, "Worker %d conectado (fd=%d)", id, fd);
 }
-
-void worker_eliminar_por_fd(int fd) {
-    pthread_mutex_lock(&mutex_workers);
-    for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
-        t_conexionWorker* w = list_get(LISTA_WORKERS, i);
-        if (w->fd == fd) {
-            if (loggerMaster) log_warning(loggerMaster, "Worker %d desconectado (fd=%d)", w->id, fd);
-            if (w->conectado && w->fd >= 0) close(w->fd);
-            list_remove(LISTA_WORKERS, i);
-            free(w);
-            break;
-        }
-    }
-    pthread_mutex_unlock(&mutex_workers);
-}
-
 
 void worker_marcar_libre_por_fd(int fd) {
     pthread_mutex_lock(&mutex_workers);
@@ -77,35 +62,6 @@ int workers_disponibles(void) {
     }
     pthread_mutex_unlock(&mutex_workers);
     return libres;
-}
-
-
-int worker_id_por_fd(int fd) {
-    int id = -1;
-    pthread_mutex_lock(&mutex_workers);
-    for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
-        t_conexionWorker* w = list_get(LISTA_WORKERS, i);
-        if (w->fd == fd) { id = w->id; break; }
-    }
-    pthread_mutex_unlock(&mutex_workers);
-    return id;
-}
-
-void worker_eliminar_por_id(int id) {
-    pthread_mutex_lock(&mutex_workers);
-    for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
-        t_conexionWorker* w = list_get(LISTA_WORKERS, i);
-        if (w->id == id) {
-            if (loggerMaster) log_warning(loggerMaster, "Worker %d desconectado (fd=%d)", w->id, w->fd);
-            if (w->conectado && w->fd >= 0) close(w->fd);
-            list_remove(LISTA_WORKERS, i);
-            free(w);
-            pthread_mutex_unlock(&mutex_workers);
-            return;
-        }
-    }
-    pthread_mutex_unlock(&mutex_workers);
-    if (loggerMaster) log_warning(loggerMaster, "Se intentó eliminar Worker id=%d que no existe", id);
 }
 
 bool exec_buscar_por_qid(int qid, int* out_fd_qc) {
@@ -178,7 +134,7 @@ void* atenderWorker(void arg){
             int qid = *(int*) list_get(p, 0);
             int rc  = *(int*) list_get(p, 1);
             list_destroy_and_destroy_elements(p, free);
-
+            
             // TODO: marcar EXIT y avisar al QC correspondiente (usando q->fd_qc)
             // query_marcar_exit(qid, rc);
             // qc_notificar_fin(qid, rc);

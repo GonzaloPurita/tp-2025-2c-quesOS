@@ -1,3 +1,6 @@
+#ifndef SEMAFOROS_H_
+#define SEMAFOROS_H_
+
 #include <semaphore.h>
 #include <pthread.h>
 
@@ -15,4 +18,5 @@ extern sem_t hay_query_ready;     // Semáforo para contar las queries en estado
 void inicializarSemaforos();
 void destruirSemaforos();
 
-typedef enum { Q_READY, Q_EXEC, Q_EXIT } estado_query;
+
+#endif /* SEMAFOROS_H_ */

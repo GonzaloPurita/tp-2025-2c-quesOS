@@ -1,4 +1,4 @@
-#include <inicializarMaster.h>
+#include "inicializarMaster.h"
 
 static int server_fd_master = -1;
 static int NEXT_QID = 0;
@@ -85,7 +85,7 @@ void* atenderCliente(void* arg) {
 
 
         }
-
+        
         case SUBMIT_QUERY: {
             // Recibo la query: [ int prioridad ][ int len ][ char[len] path ]
             t_list* datos = recibir_paquete(fd);
@@ -95,20 +95,7 @@ void* atenderCliente(void* arg) {
                 close(fd);
                 return NULL;
             }
-            void* hilo_aging(void* arg) {
-    const int ms = configMaster->tiempo_aging_ms;
-    if (ms <= 0) return NULL;
-
-    for (;;) {
-        usleep(ms * 1000);
-        AGING_TICK_GLOBAL++;
-        aplicar_aging_ready();
-        // Puede haber cambiado quién es la mejor; despertá al planificador
-        sem_post(&hay_query_ready);
-    }
-    return NULL;
-}
-            
+                
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
 
@@ -130,11 +117,11 @@ void* atenderCliente(void* arg) {
             q->QCB->pc  = 0;
             q->fd_qc = fd;
 
-            if(configMaster -> algoritmo_planificacion == "FIFO"){
+            if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0){
                 mutex_lock(&mutex_cola_ready);
                 list_add(cola_ready, q);
                 mutex_unlock(&mutex_cola_ready);
-                sem_post(&hay_query_ready)
+                sem_post(&hay_query_ready);
             }
             else{
                 agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar

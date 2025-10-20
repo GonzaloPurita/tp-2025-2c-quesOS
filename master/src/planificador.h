@@ -1,3 +1,6 @@
+#ifndef PLANIFICADOR_H_
+#define PLANIFICADOR_H_
+
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
 #include <t_query.h>
@@ -18,6 +21,7 @@ bool cmp_query_por_prioridad(void* _a, void* _b);
 void ordenar_ready(void);
 t_conexionWorker* obtenerWorkerLibre();
 t_query* buscarQueryConMenorPrioridad();
-int64_t calcularPrioridadRestante(t_query* candidatoDesalojo);
 void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoProceso);
 void* desalojar(void* arg);
+
+#endif /* PLANIFICADOR_H_ */

@@ -1,3 +1,6 @@
+#ifndef T_QUERY_H_
+#define T_QUERY_H_
+
 #include <stdint.h>
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
@@ -28,3 +31,5 @@ extern t_list*  cola_exit;
 
 void* hilo_aging(void* arg);
 void aplicar_aging_ready(void);
+
+#endif /* T_QUERY_H_ */

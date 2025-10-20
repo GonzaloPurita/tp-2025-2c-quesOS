@@ -58,13 +58,8 @@ void planificarConDesalojoYAging() {
         continue;
     }
 
-    int64_t prioridadVictima = calcularPrioridadRestante(candidatoDesalojo);
-    log_debug(loggerMaster,
-        "Comparo para desalojar: NUEVA QID=%d (p=%d) vs VICTIMA QID=%d (p=%" PRId64 ")",
-        query->QCB->qid, query->prioridad_actual,
-        candidatoDesalojo->QCB->qid, prioridadVictima);
-
-    pthread_mutex_unlock(&mutex_cola_exec);
+    int prioridadVictima = candidatoDesalojo ->prioridad_actual; // devuelve prioridad_actual (int)
+    log_debug(loggerMaster,"Comparo para desalojar: NUEVA QID=%d (p=%d) vs VICTIMA QID=%d (p=%d)",query->QCB->qid, query->prioridad_actual, candidatoDesalojo->QCB->qid, prioridadVictima);
 
     // Prioridad más BAJA es MEJOR. Desalojar si la nueva es mejor que la víctima.
     if (query->prioridad_actual < prioridadVictima) {
@@ -153,15 +148,9 @@ t_query* buscarQueryConMenorPrioridad() {
     return victima;
 }
 
-// En prioridades no hay “restante”: usamos la prioridad_actual del candidato.
-int64_t calcularPrioridadRestante(t_query* candidatoDesalojo) {
-    return candidatoDesalojo->prioridad_actual;
-}
-
 void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     // 1) Logs y métricas
-    log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades",
-             candidatoDesalojo->QCB->qid);
+    log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades", candidatoDesalojo->QCB->qid);
 
     // 2) Movemos a las queries de colas
     pthread_mutex_lock(&mutex_cola_exec);
@@ -183,7 +172,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     datos->candidatoDesalojo = candidatoDesalojo;
     datos->nuevoQuery = nuevoQuery;
 
-    // Encontrar el worker donde corre el candidato (igual que tu “encontrarCpuPorPid”)
+    // Buscamos el worker donde corre el candidato 
     datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->qid);
     if (datos->worker == NULL) {
         log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->qid);

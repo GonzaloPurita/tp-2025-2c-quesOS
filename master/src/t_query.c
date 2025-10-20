@@ -4,10 +4,20 @@ t_query* crearQuery(const char* path, int prioridad) {
     pthread_mutex_lock(&mutex_queries);
 
     t_query* q = malloc(sizeof(t_query));
-    if (!q) { log_error(loggerMaster, "Error al crear la query"); pthread_mutex_unlock(&mutex_queries); return NULL; }
+    if (!q) { 
+        log_error(loggerMaster, "Error al crear la query"); 
+        pthread_mutex_unlock(&mutex_queries); 
+        return NULL; 
+    }
 
     q->QCB = crearQCB();
-    if (!q->QCB) { log_error(loggerMaster, "Error al crear QCB"); free(q); pthread_mutex_unlock(&mutex_queries); return NULL; }
+    if (!q->QCB) { 
+        log_error(loggerMaster, "Error al crear QCB"); 
+        free(q); 
+        pthread_mutex_unlock(&mutex_queries); return NULL; 
+    }
+
+    //TODO: CHECK si hay que asignarle a la query prioridad aunque planifiquemos FIFO
 
     q->path = strdup(path);
     q->prioridad = prioridad;
@@ -15,7 +25,6 @@ t_query* crearQuery(const char* path, int prioridad) {
 
     q->IDAging = AGING_TICK_GLOBAL;  // clave para no envejecer YA
     q->pc_actual = 0;
-
     q->estado = Q_READY;
 
     pthread_mutex_unlock(&mutex_queries);
@@ -51,7 +60,6 @@ void agregarAReadyPorPrioridad(t_query* q){
         // Si es igual o mejor, seguimos avanzando para que los "más viejos" queden antes.
         i++;
     }
-
     list_add_in_index(cola_ready, i, q); // agregamos con index para que ante prioridades iguales se respete el orden de llegada
     pthread_mutex_unlock(&mutex_cola_ready);
 
@@ -63,11 +71,12 @@ void agregarAReadyPorPrioridad(t_query* q){
 
 //Cuestiones de AGING
 
+//ACA LO TENDRIAMOS REPETIDO, VER SI LO DEJO ACA O EN INICIALIZAR MASTER
 void* hilo_aging(void* arg) {
     const int ms = configMaster->tiempo_aging_ms;
     if (ms <= 0) return NULL;
 
-    for (;;) {
+    while(1) {
         usleep(ms * 1000);
         AGING_TICK_GLOBAL++;
         aplicar_aging_ready();
@@ -92,14 +101,15 @@ void aplicar_aging_ready(void) {
             q->prioridad_actual = anterior - 1; // 0 es mejor
             q->IDAging = AGING_TICK_GLOBAL;
             hubo_cambios = 1;
-            log_info(loggerMaster, "AGING QID=%d: %d -> %d",
-                     q->QCB->qid, anterior, q->prioridad_actual);
+            log_info(loggerMaster, "AGING QID=%d: %d -> %d", q->QCB->qid, anterior, q->prioridad_actual);
         }
     }
 
     if (hubo_cambios) {
+        //TODO: chequear que respete orden de llegada entre iguales y sino cambiar por list_add_index
         // Reordenar READY por prioridad actual (0 mejor). Sin inventos.
-        list_sort(cola_ready, cmp_ready_por_prioridad);
+        // VER QUE FUNCION USAR, SI LA BOOLEANA O ESTA.
+        list_sort(cola_ready, agregarAReadyPorPrioridad());
     }
 
     pthread_mutex_unlock(&mutex_cola_ready);
