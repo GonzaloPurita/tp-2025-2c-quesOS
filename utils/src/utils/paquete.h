@@ -5,10 +5,21 @@
 #include<stdlib.h>
 #include<string.h>
 #include<commons/collections/list.h>
-#include"conexiones.h"
+#include "conexiones.h"
 
 typedef enum {
-	MENSAJE
+	MENSAJE,
+
+	// WORKER <---> MASTER
+	ID_WORKER,
+	RTA_ID_WORKER,
+	NUEVA_QUERY,
+	OP_END,
+	OP_READ,
+	DESALOJO,
+	RTA_DESALOJO,
+	OP_WRITE,
+	OP_ERROR,
 
 	// WORKER <---> STORAGE
 	TAMANIO_BLOQUE,
@@ -18,7 +29,15 @@ typedef enum {
 	OP_TAG,
 	OP_COMMIT,
 	PED_PAG,
-	GUARDAR_MODIFICADAS
+	GUARDAR_MODIFICADAS,
+
+	// RESPUESTAS - ERRORES
+	OP_SUCCESS,
+	ERROR_FILE_NOT_FOUND,
+	ERROR_TAG_NOT_FOUND,
+	ERROR_NO_SPACE,
+	ERROR_WRITE_NOT_ALLOWED,
+	ERROR_OUT_OF_BOUNDS
 }op_code;
 
 
