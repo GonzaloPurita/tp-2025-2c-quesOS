@@ -1,5 +1,8 @@
 {
-    "files.associations": {
-        "log.h": "c"
-    }
+  "files.associations": {
+    "log.h": "c",
+    "inicializacion.h": "c",
+    "filetags.h": "c",
+    "bloques.h": "c"
+  }
 }
