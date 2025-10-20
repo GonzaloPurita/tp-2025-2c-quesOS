@@ -26,6 +26,12 @@ void truncar(t_list* data, int socket_cliente) {
         return;
     }
 
+    if (strcmp("COMMITED", config_get_string_value(metadata, "ESTADO")) == 0) {
+        enviarRespueta(ERROR_WRITE_NOT_ALLOWED, socket_cliente);
+        config_destroy(metadata);
+        return;
+    }
+
     char** blocks = config_get_array_value(metadata, "BLOCKS");
     int bloquesActuales = contarElementos(blocks);
 
@@ -38,6 +44,7 @@ void truncar(t_list* data, int socket_cliente) {
     else{
         reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, blocks, socket_cliente);   
     }
+    string_array_destroy(blocks);
     config_destroy(metadata);
 }
 
