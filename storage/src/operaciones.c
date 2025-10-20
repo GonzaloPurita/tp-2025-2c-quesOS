@@ -2,8 +2,10 @@
 
 // Privados
 void enviarRespueta(op_code codigo, int socket_cliente);
-void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, int socket_cliente);
-void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, int socket_cliente);
+void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int socket_cliente);
+void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int socket_cliente);
+int contarElementos(char** array);
+void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos);
 
 void crearFile(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
@@ -24,17 +26,19 @@ void truncar(t_list* data, int socket_cliente) {
         return;
     }
 
-    int bloquesActuales = config_get_int_value(metadata, "BLOCKS");
+    char** blocks = config_get_array_value(metadata, "BLOCKS");
+    int bloquesActuales = contarElementos(blocks);
 
     if(bloquesActuales == nuevoTamanio){
         enviarRespueta(OP_SUCCESS, socket_cliente);
     }
     else if(bloquesActuales < nuevoTamanio){
-        agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, socket_cliente);
+        agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, socket_cliente);
     }
     else{
-        reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, socket_cliente);   
+        reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, blocks, socket_cliente);   
     }
+    config_destroy(metadata);
 }
 
 // Privados - Implementaciones
@@ -45,29 +49,100 @@ void enviarRespueta(op_code codigo, int socket_cliente) {
     eliminar_paquete(paqueteRespuesta);
 }
 
-void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, int socket_cliente) {
+void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int socket_cliente) {
     int i = bloquesActuales;
-    for(i; i < nuevoTamanio; i++) {
-        if(!agregarBloqueLogicoHL(nombreFile, nombreTag, i, 0)) {
-            enviarRespueta(OP_FAILED, socket_cliente);
-            goto error;
+    bool error = false;
+
+    for (; i < nuevoTamanio; i++) {
+        if (!agregarBloqueLogicoHL(nombreFile, nombreTag, i, 0)) {
+            error = true;
+            break;
         }
     }
 
-    error:
+    if (error) {
         for (int j = bloquesActuales; j < i; j++) {
-            // TODO:
-            // Aquí debería eliminar los bloques lógicos que se hayan creado hasta el error
-            // Pero como no tenemos una función para eso, lo dejamos así por ahora
+            eliminarBloqueLogicoHL(nombreFile, nombreTag, j);
         }
-        return;
+        enviarRespueta(OP_FAILED, socket_cliente);
+    } else {
+        int* bloquesFisicos = NULL;
+        if (nuevoTamanio > 0) {
+            bloquesFisicos = malloc(sizeof(int) * nuevoTamanio);
+        }
+        for (int k = 0; k < bloquesActuales; k++) {
+            bloquesFisicos[k] = atoi(blocks[k]);
+        }
+        actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bloquesFisicos);
+        free(bloquesFisicos);
+        enviarRespueta(OP_SUCCESS, socket_cliente);
+    }
 }
 
-// TODO: Implementar la función reducirFileTag
-void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, int socket_cliente) {
-    for(int i = bloquesActuales - 1; i >= nuevoTamanio; i--) {
-        // if(!eliminarBloqueLogicoHL(nombreFile, nombreTag, i)) {
-        //     enviarRespueta(OP_FAILED, socket_cliente);
-        // }
+void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int socket_cliente) {
+    int i;
+    bool error = false;
+
+    for (i = bloquesActuales - 1; i >= nuevoTamanio; i--) {
+        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, i)) {
+            error = true;
+            break;
+        }
     }
+
+    if (error) {
+        // Restaurar bloques eliminados previamente
+        // TODO: Restauración?
+        log_error(loggerStorage, "Error al reducir el FileTag %s:%s", nombreFile, nombreTag);
+        enviarRespueta(OP_FAILED, socket_cliente);
+    } else {
+        int* bloquesFisicos = NULL;
+        if (nuevoTamanio > 0) {
+            bloquesFisicos = malloc(sizeof(int) * nuevoTamanio);
+        }
+        for (int k = 0; k < nuevoTamanio; k++) {
+            bloquesFisicos[k] = atoi(blocks[k]);
+        }
+        actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bloquesFisicos);
+        free(bloquesFisicos);
+        enviarRespueta(OP_SUCCESS, socket_cliente);
+    }
+}
+
+int contarElementos(char** array) {
+    int count = 0;
+    while (array[count] != NULL) {
+        count++;
+    }
+    return count;
+}
+
+void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos) {
+    // Crear un string para almacenar la lista de bloques
+    char* bloquesActualizados = string_new();
+    string_append(&bloquesActualizados, "[");
+
+    for (int i = 0; i < nuevoTamanio; i++) {
+        if (i < bloquesActuales) {
+            // Agregar los bloques físicos existentes
+            char* bloque = string_itoa(bloquesFisicos[i]);
+            string_append(&bloquesActualizados, bloque);
+            free(bloque);
+        } else {
+            // Agregar ceros para los nuevos bloques
+            string_append(&bloquesActualizados, "0");
+        }
+
+        // Agregar coma si no es el último elemento
+        if (i < nuevoTamanio - 1) {
+            string_append(&bloquesActualizados, ",");
+        }
+    }
+
+    string_append(&bloquesActualizados, "]");
+
+    // Actualizar la metadata
+    config_set_value(metadata, "BLOCKS", bloquesActualizados);
+    config_save(metadata);
+    free(bloquesActualizados);
 }

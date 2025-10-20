@@ -54,6 +54,16 @@ bool crearFileInicial();
 bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico);
 
 /**
+ * @brief Elimina un bloque lógico de un fileTag específico.
+ * 
+ * @param nombreFile Nombre del archivo asociado al fileTag.
+ * @param nombreTag Nombre de la etiqueta asociada al fileTag.
+ * @param numeroBloqueLogico Número del bloque lógico que se desea eliminar.
+ * @return true si el bloque se eliminó exitosamente, false en caso contrario.
+ */
+bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico);
+
+/**
  * @brief Obtiene la metadata de un fileTag específico.
  * 
  * @param file Nombre del archivo asociado al fileTag.

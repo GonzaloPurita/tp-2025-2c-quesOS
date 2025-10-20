@@ -2,7 +2,7 @@
 
 // Funciones privadas
 bool crearMetaData(char* path);
-void eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico);
+bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico);
 void free_wrapper(char* line);
 
 bool crearFileInicial() {
@@ -152,19 +152,19 @@ bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLo
     return true;
 }
 
-void eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico) {
+bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
         log_error(loggerStorage, "Error eliminando bloque lógico, el nombre del file o del tag es NULL");
-        return;
+        return false;
     }
     if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
         log_error(loggerStorage, "Error eliminando bloque lógico, el nombre del file o del tag está vacío");
-        return;
+        return false;
     }
     if (numeroBloqueLogico < 0) {
         log_error(loggerStorage, "Error eliminando bloque lógico, el número de bloque lógico es negativo");
-        return;
+        return false;
     }
 
     // Creo la ruta completa a donde va el bloque lógico
@@ -177,26 +177,44 @@ void eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueL
     int bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
     if(bloqueFisico == -1) {
         free(rutaBloqueLogico);
-        return;
+        return false;
     }
 
     eliminarHardlink(rutaBloqueLogico, numeroBloqueLogico, bloqueFisico);
 
     free(rutaBloqueLogico);
+    return true;
 }
 
-void eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico) {
+bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico) {
+    // Validación de parámetros
+    if (rutaBloqueLogico == NULL || numeroBloqueLogico < 0 || bloqueFisico < 0) {
+        log_error(loggerStorage, "Parámetros inválidos en eliminarHardlink");
+        return false;
+    }
+
     // Genero la ruta para el bloque lógico
     char* rutaBloqueLogicoTemp = string_duplicate(rutaBloqueLogico); // El append modifica el puntero, por eso hago una copia
     char* nombre = crearNombreBloque(numeroBloqueLogico);
     string_append(&rutaBloqueLogicoTemp, nombre);
     free(nombre);
-    unlink(rutaBloqueLogicoTemp); // Esto elimina el hard link
 
-    if(esHardlinkUnico(rutaBloqueLogicoTemp) && (bloqueFisico != 0))
-        bitarray_clean_bit(bitmap, bloqueFisico); // Marco el bloque físico como libre        
+    // Verifico si el bloque físico es único
+    if (esHardlinkUnico(rutaBloqueLogicoTemp) && (bloqueFisico != 0)) {
+        // Marco el bloque físico como libre en el bitmap
+        bitarray_clean_bit(bitmap, bloqueFisico);
+        log_debug(loggerStorage, "Bloque físico %d marcado como libre", bloqueFisico);
+    }
 
+    // Elimino el hardlink
+    if (unlink(rutaBloqueLogicoTemp) == -1) {
+        log_error(loggerStorage, "Error al eliminar el hardlink: %s", rutaBloqueLogicoTemp);
+        return false;
+    }
+
+    // Libero la memoria
     free(rutaBloqueLogicoTemp);
+    return true;
 }
 
 int obtenerBloqueFisico(char* file, char* tag, int numeroBloqueLogico) {
