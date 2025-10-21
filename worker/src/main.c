@@ -6,10 +6,11 @@ int main(int argc, char* argv[]) {
 
     // --- Conexión a Storage ---
     char* puertoStorage = string_itoa(configWorker->puerto_storage);
-    int conexionStorage = crearConexionCliente(configWorker->ip_storage, puertoStorage);
+    conexionStorage = crearConexionCliente(configWorker->ip_storage, puertoStorage);
     free(puertoStorage);
-
+    log_info(loggerWorker, "la conexion con storage es: %d", conexionStorage);
     pedir_tamanio_de_bloque(); // llega el TAM_BLOQUE (global)
+
     iniciar_memoria(); // inicializa memoria interna usando el TAM_BLOQUE
 
     // --- Conexión a Master ---

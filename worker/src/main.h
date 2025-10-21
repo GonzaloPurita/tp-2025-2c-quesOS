@@ -13,7 +13,6 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include "pedidos.h"
-#include <utilsWorker/globales.h>
 #include "query_interpreter.h"
 
 pthread_t hilo_listener;

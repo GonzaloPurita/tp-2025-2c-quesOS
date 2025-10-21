@@ -1,3 +1,19 @@
+### *Mini recordatorio para ejecutar el storage*
+---
+- crear carpeta storage --> home/utn/storage
+- dentro de ahi crear:
+   - superblock.config
+   - bitmap.bin
+   - blocks_hash_index.config
+   - carpetas:
+   - physical_blocks/
+   - files/
+
+- ejercutar: 
+   ./bin/storage storage.config
+
+   ./bin/worker worker.config
+
 # **Guía de Pruebas entre Worker y Storage (Master of Files)**
 
 Esta guía detalla los pasos para probar el flujo entre el módulo **Worker** y el **Storage** dentro del TP **Master of Files**, usando un **mock de Storage** hecho por tu compañero.  

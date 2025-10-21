@@ -41,6 +41,7 @@ void incializarSuperblock() {
 
     superblock->fssize = config_get_int_value(config, "FS_SIZE");
     superblock->blocksize = config_get_int_value(config, "BLOCK_SIZE");
+    log_info(loggerStorage, "tamanio de bloque: %d", superblock->blocksize);
 
     superblock->nroBloques = superblock->fssize / superblock->blocksize;
 

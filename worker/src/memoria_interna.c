@@ -26,13 +26,13 @@ bool esta_en_memoria(t_formato* formato, int nro_pagina) {
     free(clave_tabla);
 
     if (tabla == NULL) {
-        free(clave);
         log_error(loggerWorker, "No existe tabla de páginas para %s:%s", formato->file_name, formato->tag);
         return false;
     }
 
-    entrada_pag* entrada = dictionary_get(tabla->paginas, clave);
-    free(clave);
+    char* clave_pagina = string_from_format("%d", nro_pagina);
+    entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pagina);
+    free(clave_pagina);
 
     if (entrada == NULL) {
         log_error(loggerWorker, "No existe entrada para la página %d en %s:%s", nro_pagina, formato->file_name, formato->tag);

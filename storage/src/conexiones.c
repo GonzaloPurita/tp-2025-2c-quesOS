@@ -35,14 +35,17 @@ void recibirCliente(void* cliente) {
 
     t_list* datosRecibidos = NULL;
     t_paquete* datosEnviados = NULL;
-
+    log_info(loggerStorage, "Entre a recibirCliente()");
     while(1) {
+        log_info(loggerStorage, "Esperando peticiones del Worker...");
         op_code cod = recibir_operacion(socket_cliente);
-        log_debug(loggerStorage, "Operacion recibida: %d", cod);
+        log_info(loggerStorage, "Operacion recibida: %d", cod);
         switch(cod) {
             case TAMANIO_BLOQUE: {
+                log_info(loggerStorage, "Handshake correcto, respondiendo con blocksize=%d", superblock->blocksize);
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
+                log_info(loggerStorage, "tamanio de bloque: %d", superblock->blocksize);
                 datosEnviados = crearNuevoPaquete(TAMANIO_BLOQUE);
                 agregar_a_paquete(datosEnviados, &(superblock->blocksize), sizeof(int));
                 enviar_paquete(datosEnviados, socket_cliente);
@@ -56,20 +59,13 @@ void recibirCliente(void* cliente) {
                 // TODO: Implementar comportamiento para OP_CREATE
                 break;
             }
-            case OP_TRUNCATE_ADD: {
+            case OP_TRUNCATE: {
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
                 enviar_paquete(datosEnviados, socket_cliente);
                 // TODO: Implementar comportamiento para OP_TRUNCATE_ADD
                 break;
-            }
-            case OP_TRUNCATE_REDUCE: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_TRUNCATE_REDUCE
             }
             case OP_DELETE: {
                 datosRecibidos = recibir_paquete(socket_cliente);

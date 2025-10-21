@@ -9,6 +9,7 @@ void inicializarFS() {
     inicializarConfigs();
     log_info(loggerStorage, "Storage iniciado");
     if (configStorage->fresh_start) { // Hay que generar todo
+        log_info(loggerStorage, "entre al if");
         formatearFS();
         crearRutaFiles();
         crearBloques();
@@ -17,11 +18,12 @@ void inicializarFS() {
         inicializarBitmap();
         bitarray_set_bit(bitmap, 0); 
         crearFileInicial();
+        log_info(loggerStorage, "sali del if");
     }
     else { // Tenemos que usar lo que ya tenemos
         cargarBitmap();
     }
-    log_debug(loggerStorage, "Sistema de archivos listo para usarse");
+    log_info(loggerStorage, "Sistema de archivos listo para usarse");
 }
 
 void formatearFS() { // Borro todo lo que haya de antes.
@@ -31,7 +33,7 @@ void formatearFS() { // Borro todo lo que haya de antes.
     char* rutaPhysical = rutaCompleta("/physical_blocks");
     char* rutaFiles = rutaCompleta("/files");
 
-    // Borro los archivos y directorios si existen
+    // Borro los archivos y directorios si existenS
     borrar(rutaBitmap);
     borrar(rutaBlocks);
     borrar(rutaPhysical);

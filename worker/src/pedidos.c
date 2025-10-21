@@ -7,12 +7,17 @@ void pedir_tamanio_de_bloque(){
     t_paquete* paqueteStorage = crear_paquete();
     paqueteStorage->codigo_operacion = TAMANIO_BLOQUE;
     int envio = 1;
+    log_info(loggerWorker, "mando este opcode: %d", paqueteStorage->codigo_operacion);
+    log_info(loggerWorker, "→ Enviando handshake TAMANIO_BLOQUE al Storage...");
     agregar_a_paquete(paqueteStorage, &envio, sizeof(int));
     enviar_paquete(paqueteStorage, conexionStorage);
+    log_info(loggerWorker, "la conexion con storage es: %d", conexionStorage);
     eliminar_paquete(paqueteStorage);
-    
+
     // Recibo el tamanio de bloque, el cual manejamos como GLOBAL
     op_code codigo_operacion = recibir_operacion(conexionStorage);
+
+    log_info(loggerWorker, "la conexion con storage es: %d, cod op: %d", conexionStorage, codigo_operacion);
     if(codigo_operacion != TAMANIO_BLOQUE){
         log_error(loggerWorker, "Error: esperaba TAMANIO_BLOQUE y llegó %d", codigo_operacion);
         return;
@@ -25,8 +30,15 @@ void pedir_tamanio_de_bloque(){
         list_destroy(lista);
         return;
     }
-        
+
+    if (list_get(lista, 0) <= 0) {
+        log_error(loggerWorker, "Handshake con Storage falló. No se pudo obtener TAM_BLOQUE: %d.", TAM_BLOQUE);
+        exit(EXIT_FAILURE);
+    }
+
     memcpy(&TAM_BLOQUE, list_get(lista, 0), sizeof(int)); // es global 
+
+    log_info(loggerWorker, "Handshake con Storage exitoso. TAM_BLOQUE: %d.", TAM_BLOQUE);
 
     list_destroy_and_destroy_elements(lista, free);
 }
