@@ -9,8 +9,6 @@
 #include <utils/paquete.h>
 
 extern t_bitarray* bitmap; // Bitmap de bloques físicos
-// TODO: Inicializar este hashmap en algún lado
-extern t_config* hashMap; // Mapa de hashes de bloques físicos
 
 /**
  * @brief Busca el contenido de un bloque físico dado su número.
@@ -122,5 +120,13 @@ bool esHardlinkUnico(const char *path);
  * @return El contenido leido o NULL si hubo un error.
  */
 char* leerBloqueFisico(int numeroBloqueFisico);
+
+/**
+ * @brief Obtiene el número de bloque físico asociado a un nombre de bloque.
+ * 
+ * @param nombreBloque Nombre del bloque.
+ * @return El número del bloque físico, o -1 si no se encuentra.
+ */
+int obtenerNumeroBloqueFisico(const char* nombreBloque);
 
 #endif /* _BLOQUES_H_ */

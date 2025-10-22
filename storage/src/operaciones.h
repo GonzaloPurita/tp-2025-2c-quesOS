@@ -56,4 +56,16 @@ void tag(t_list* data, int socket_cliente);
  */
 void eliminarTag(t_list* data, int socket_cliente);
 
+/**
+ * @brief Realiza un commit de una etiqueta (tag) de un archivo en el sistema de almacenamiento.
+ *
+ * Esta función realiza un commit de una etiqueta asociada a un archivo utilizando los datos
+ * proporcionados en la lista `data`. Además, envía una respuesta al cliente a través
+ * del socket especificado.
+ *
+ * @param data Lista de datos necesarios para realizar el commit.
+ * @param socket_cliente Descriptor del socket del cliente para enviar la respuesta.
+ */
+void commit(t_list* data, int socket_cliente);
+
 #endif // _OPERACIONES_H

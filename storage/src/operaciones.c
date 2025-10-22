@@ -173,7 +173,7 @@ void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio
 
     string_append(&bloquesActualizados, "]");
 
-    // Actualizar la metadata
+    // Actualizar la metadata (clave BLOCKS)
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     config_save(metadata);
     free(bloquesActualizados);

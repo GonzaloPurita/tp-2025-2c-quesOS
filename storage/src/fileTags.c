@@ -5,6 +5,8 @@ bool crearMetaData(char* path);
 bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico);
 void free_wrapper(char* line);
 op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag);
+// Nueva función auxiliar para actualizar la metadata de BLOCKS
+static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, int numeroBloqueFisico);
 
 bool crearFileInicial() {
     if (!crearFileTag("initial_file", "BASE")) {
@@ -87,7 +89,7 @@ bool crearMetaData(char* path) {
     // Creamos los valores de metadata
     t_dictionary* data = dictionary_create();
     dictionary_put(data, "TAMAÑO", "0");
-    dictionary_put(data, "BLOQUES", "[]");
+    dictionary_put(data, "BLOCKS", "[]");
     dictionary_put(data, "ESTADO", "WORK_IN_PROGRESS");
     metadata->properties = data;
 
@@ -157,6 +159,12 @@ bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLo
     }
 
     free(rutaBloqueLogico);
+
+    // Actualizo metadata BLOCKS en el índice correspondiente
+    if (!setBloqueEnMetadata(nombreFile, nombreTag, numeroBloqueLogico, numeroBloqueFisico)) {
+        log_warning(loggerStorage, "No se pudo actualizar metadata BLOCKS para %s:%s[%d]", nombreFile, nombreTag, numeroBloqueLogico);
+    }
+
     return true;
 }
 
@@ -188,10 +196,17 @@ bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueL
         return false;
     }
 
-    eliminarHardlink(rutaBloqueLogico, numeroBloqueLogico, bloqueFisico);
-
+    bool ok = eliminarHardlink(rutaBloqueLogico, numeroBloqueLogico, bloqueFisico);
     free(rutaBloqueLogico);
-    return true;
+
+    // Pongo 0 en metadata para ese índice si salió bien
+    if (ok) {
+        if (!setBloqueEnMetadata(nombreFile, nombreTag, numeroBloqueLogico, 0)) {
+            log_warning(loggerStorage, "No se pudo actualizar metadata BLOCKS (0) para %s:%s[%d]", nombreFile, nombreTag, numeroBloqueLogico);
+        }
+    }
+
+    return ok;
 }
 
 bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico) {
@@ -234,7 +249,7 @@ int obtenerBloqueFisico(char* file, char* tag, int numeroBloqueLogico) {
     }
 
     // Obtener la lista de bloques físicos
-    char** bloques = config_get_array_value(metadata, "BLOQUES");
+    char** bloques = config_get_array_value(metadata, "BLOCKS");
     if (bloques == NULL) {
         log_error(loggerStorage, "No se pudo obtener la lista de bloques físicos para %s:%s", file, tag);
         config_destroy(metadata);
@@ -359,6 +374,69 @@ op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueL
     }
 
     char* contenido = leerBloqueFisico(bloqueFisico);
-    // TODO: Terminar
+    char* hash = crypto_md5(contenido, superblock->blocksize);
+    free(contenido);
+
+    if(config_has_property(hashMap, hash)) {
+        char* bloqueConEseHash = config_get_string_value(hashMap, hash);
+        int nroBloqueConEseHash = obtenerNumeroBloqueFisico(bloqueConEseHash);
+        eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico);
+        agregarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, nroBloqueConEseHash);
+        free(hash);
+        return OP_SUCCESS;
+    } else {
+        config_set_value(hashMap, hash, crearNombreBloque(bloqueFisico));
+        config_save(hashMap);
+        free(hash);
+    }
     return OP_SUCCESS;
+}
+
+// Implementación auxiliar: setea/expande BLOCKS y guarda metadata
+static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, int numeroBloqueFisico) {
+    if (file == NULL || tag == NULL || numeroBloqueLogico < 0) return false;
+
+    t_config* metadata = getMetaData(file, tag);
+    if (metadata == NULL) return false;
+
+    char** bloques = config_get_array_value(metadata, "BLOCKS");
+
+    // Calcular longitud actual
+    int lenActual = 0;
+    if (bloques != NULL) {
+        while (bloques[lenActual] != NULL) lenActual++;
+    }
+
+    int lenNuevo = (numeroBloqueLogico + 1 > lenActual) ? numeroBloqueLogico + 1 : lenActual;
+
+    // Construir string del array actualizado
+    char* bloquesActualizados = string_new();
+    string_append(&bloquesActualizados, "[");
+    for (int i = 0; i < lenNuevo; i++) {
+        int valor = 0;
+        if (i < lenActual && bloques != NULL) {
+            valor = atoi(bloques[i]);
+        }
+        if (i == numeroBloqueLogico) {
+            valor = numeroBloqueFisico;
+        }
+        char* svalor = string_itoa(valor);
+        string_append(&bloquesActualizados, svalor);
+        free(svalor);
+        if (i < lenNuevo - 1) string_append(&bloquesActualizados, ",");
+    }
+    string_append(&bloquesActualizados, "]");
+
+    config_set_value(metadata, "BLOCKS", bloquesActualizados);
+    config_save(metadata);
+
+    // Liberaciones
+    if (bloques != NULL) {
+        string_iterate_lines(bloques, free_wrapper);
+        free(bloques);
+    }
+    free(bloquesActualizados);
+    config_destroy(metadata);
+
+    return true;
 }

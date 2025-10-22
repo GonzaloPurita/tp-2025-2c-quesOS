@@ -259,3 +259,21 @@ char* leerBloqueFisico(int numeroBloqueFisico) {
     free(rutaBloque);
     return datos;
 }
+
+int obtenerNumeroBloqueFisico(const char* nombreBloque) {
+    // Validar que el nombre del bloque no sea NULL
+    if (nombreBloque == NULL) {
+        log_error(loggerStorage, "Error: El nombre del bloque es NULL");
+        return -1;
+    }
+
+    // Verificar que el nombre del bloque tenga el prefijo esperado "block"
+    if (strncmp(nombreBloque, "block", 5) != 0) {
+        log_error(loggerStorage, "Error: El nombre del bloque no tiene el prefijo esperado: %s", nombreBloque);
+        return -1;
+    }
+
+    // Convertir la parte numérica del nombre del bloque a un entero
+    int numeroBloque = atoi(nombreBloque + 5);
+    return numeroBloque;
+}

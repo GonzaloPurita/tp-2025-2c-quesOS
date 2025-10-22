@@ -1,8 +1,10 @@
 #include "configs.h"
+#include "auxiliares.h"
 
 t_config_storage* configStorage;
 t_superblock* superblock;
 t_log* loggerStorage;
+t_config* hashMap; 
 
 void inicializarConfigStorage() {
     configStorage = malloc(sizeof(t_config_storage));
@@ -48,9 +50,52 @@ void incializarSuperblock() {
     free(rutaSuperBlock);
 }
 
+void incializarHashMap() {
+    // Ruta del índice de hashes bajo el punto de montaje
+    char* ruta = string_duplicate(configStorage->punto_montaje);
+    // Aseguro separador
+    if (ruta[strlen(ruta) - 1] != '/') {
+        string_append(&ruta, "/");
+    }
+    string_append(&ruta, "blocks_hash_index.config");
+
+    // Si existe, lo abro. Si no, lo creo vacío y lo abro.
+    if (archivoExiste(ruta)) {
+        hashMap = config_create(ruta);
+        if (hashMap == NULL) {
+            log_error(loggerStorage, "blocks_hash_index.config existe pero no pudo leerse. Re-creando vacío.");
+        }
+    }
+
+    if (hashMap == NULL) {
+        t_config* nuevo = malloc(sizeof(t_config));
+        if (nuevo == NULL) {
+            log_error(loggerStorage, "Sin memoria para crear hashMap");
+            free(ruta);
+            return;
+        }
+        nuevo->properties = dictionary_create();
+        nuevo->path = string_duplicate(ruta);
+        if (config_save_in_file(nuevo, nuevo->path) == -1) {
+            log_error(loggerStorage, "No se pudo crear %s", ruta);
+            // Liberar recursos parcialmente creados
+            dictionary_destroy(nuevo->properties);
+            free(nuevo->path);
+            free(nuevo);
+            hashMap = NULL;
+            free(ruta);
+            return;
+        }
+        hashMap = nuevo;
+    }
+
+    free(ruta);
+}
+
 void inicializarConfigs() {
     inicializarConfigStorage();
     incializarSuperblock();
+    // incializarHashMap(); // Mover a inicializarFS, post formateo/carga
 }
 
 void liberarConfigs() {
@@ -59,6 +104,10 @@ void liberarConfigs() {
     free(configStorage);
     free(superblock);
     log_destroy(loggerStorage);
+    if (hashMap != NULL) {
+        config_destroy(hashMap);
+        hashMap = NULL;
+    }
 }
 
 char* estadoToString(t_estado_fileTag estado) {
