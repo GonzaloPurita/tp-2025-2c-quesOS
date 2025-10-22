@@ -44,4 +44,16 @@ void truncar(t_list* data, int socket_cliente);
  */
 void tag(t_list* data, int socket_cliente);
 
+/**
+ * @brief Elimina una etiqueta (tag) de un archivo en el sistema de almacenamiento.
+ *
+ * Esta función elimina una etiqueta asociada a un archivo utilizando los datos
+ * proporcionados en la list `data`. Además, envía una respuesta al cliente a través
+ * del socket especificado.
+ *
+ * @param data Lista de datos necesarios para eliminar la etiqueta.
+ * @param socket_cliente Descriptor del socket del cliente para enviar la respuesta.
+ */
+void eliminarTag(t_list* data, int socket_cliente);
+
 #endif // _OPERACIONES_H

@@ -1,17 +1,18 @@
 #include "operaciones.h"
 
 // Privados
-void enviarRespueta(op_code codigo, int socket_cliente);
+void enviarRespuesta(op_code codigo, int socket_cliente);
 void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int socket_cliente);
 void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int socket_cliente);
 int contarElementos(char** array);
 void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos);
+op_code borrarTag(char* nombreFile, char* nombreTag);
 
 void crearFile(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     op_code resultado = crearFileTag(nombreFile, nombreTag);
-    enviarRespueta(resultado, socket_cliente);
+    enviarRespuesta(resultado, socket_cliente);
 }
 
 void truncar(t_list* data, int socket_cliente) {
@@ -22,12 +23,12 @@ void truncar(t_list* data, int socket_cliente) {
     t_config* metadata = getMetaData(nombreFile, nombreTag);
 
     if (metadata == NULL) {
-        enviarRespueta(ERROR_FILE_NOT_FOUND, socket_cliente);
+        enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
         return;
     }
 
     if (strcmp("COMMITED", config_get_string_value(metadata, "ESTADO")) == 0) {
-        enviarRespueta(ERROR_WRITE_NOT_ALLOWED, socket_cliente);
+        enviarRespuesta(ERROR_WRITE_NOT_ALLOWED, socket_cliente);
         config_destroy(metadata);
         return;
     }
@@ -36,7 +37,7 @@ void truncar(t_list* data, int socket_cliente) {
     int bloquesActuales = contarElementos(blocks);
 
     if(bloquesActuales == nuevoTamanio){
-        enviarRespueta(OP_SUCCESS, socket_cliente);
+        enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
     else if(bloquesActuales < nuevoTamanio){
         agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, socket_cliente);
@@ -52,13 +53,18 @@ void tag(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     op_code resultado = crearTag(nombreFile, nombreTag);
-    enviarRespueta(resultado, socket_cliente);
+    enviarRespuesta(resultado, socket_cliente);
 }
 
-
+void eliminarTag(t_list* data, int socket_cliente) {
+    char* nombreFile = list_get(data, 0);
+    char* nombreTag = list_get(data, 1);
+    op_code resultado = borrarTag(nombreFile, nombreTag);
+    enviarRespuesta(resultado, socket_cliente);
+}
 
 // Privados - Implementaciones
-void enviarRespueta(op_code codigo, int socket_cliente) {
+void enviarRespuesta(op_code codigo, int socket_cliente) {
     t_paquete* paqueteRespuesta = crear_paquete();
     paqueteRespuesta->codigo_operacion = codigo;
     enviar_paquete(paqueteRespuesta, socket_cliente);
@@ -80,18 +86,20 @@ void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bl
         for (int j = bloquesActuales; j < i; j++) {
             eliminarBloqueLogicoHL(nombreFile, nombreTag, j);
         }
-        enviarRespueta(OP_FAILED, socket_cliente);
+        enviarRespuesta(OP_FAILED, socket_cliente);
     } else {
-        int* bloquesFisicos = NULL;
-        if (nuevoTamanio > 0) {
-            bloquesFisicos = malloc(sizeof(int) * nuevoTamanio);
+        int* bloquesFisicos = malloc(sizeof(int) * nuevoTamanio);
+        if (bloquesFisicos == NULL) {
+            log_error(loggerStorage, "Error al asignar memoria para bloquesFisicos");
+            enviarRespuesta(OP_FAILED, socket_cliente);
+            return;
         }
         for (int k = 0; k < bloquesActuales; k++) {
             bloquesFisicos[k] = atoi(blocks[k]);
         }
         actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bloquesFisicos);
         free(bloquesFisicos);
-        enviarRespueta(OP_SUCCESS, socket_cliente);
+        enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
 }
 
@@ -110,7 +118,7 @@ void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int 
         // Restaurar bloques eliminados previamente
         // TODO: Restauración?
         log_error(loggerStorage, "Error al reducir el FileTag %s:%s", nombreFile, nombreTag);
-        enviarRespueta(OP_FAILED, socket_cliente);
+        enviarRespuesta(OP_FAILED, socket_cliente);
     } else {
         int* bloquesFisicos = NULL;
         if (nuevoTamanio > 0) {
@@ -121,7 +129,7 @@ void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int 
         }
         actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bloquesFisicos);
         free(bloquesFisicos);
-        enviarRespueta(OP_SUCCESS, socket_cliente);
+        enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
 }
 
@@ -161,4 +169,28 @@ void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     config_save(metadata);
     free(bloquesActualizados);
+}
+
+op_code borrarTag(char* nombreFile, char* nombreTag) {
+    t_config* metadata = getMetaData(nombreFile, nombreTag);
+    if (metadata == NULL) {
+        return ERROR_FILE_NOT_FOUND;
+    }
+
+    char** blocks = config_get_array_value(metadata, "BLOCKS");
+    int bloquesActuales = contarElementos(blocks);
+
+    // Eliminar todos los bloques lógicos asociados
+    for (int i = 0; i < bloquesActuales; i++) {
+        eliminarBloqueLogicoHL(nombreFile, nombreTag, i);
+    }
+
+    // Eliminar el FileTag
+    char* pathTag = rutaFileTag(nombreFile, nombreTag);
+    config_destroy(metadata);
+    borrar(pathTag);
+    free(pathTag);
+    string_array_destroy(blocks);
+
+    return OP_SUCCESS;
 }
