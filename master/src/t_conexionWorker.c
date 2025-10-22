@@ -25,7 +25,7 @@ void worker_registrar(int id, int fd) {
     w->fd = fd;
     w->conectado = true;
     w->qid_actual = -1;
-    w->semaforo = sem_init(w->semaforo);
+    sem_init(&w->semaforo, 0, 0);
 
     pthread_mutex_lock(&mutex_workers);
     if(!LISTA_WORKERS){
@@ -64,13 +64,24 @@ int workers_disponibles(void) {
     return libres;
 }
 
+t_conexionWorker* encontrarWorkerPorQid(int qid) {
+    pthread_mutex_lock(&mutex_workers);
+    t_conexionWorker* w = NULL;
+    for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
+        t_conexionWorker* it = list_get(LISTA_WORKERS, i);
+        if (it->conectado && it->qid_actual == qid) { w = it; break; }
+    }
+    pthread_mutex_unlock(&mutex_workers);
+    return w;
+}
+
 bool exec_buscar_por_qid(int qid, int* out_fd_qc) {
     bool ok = false;
     pthread_mutex_lock(&mutex_cola_exec);
     int n = list_size(cola_exec);
     for (int i = 0; i < n; i++) {
         t_query* q = list_get(cola_exec, i);
-        if (q->QCB->qid == qid) {
+        if (q->QCB->QID == qid) {
             *out_fd_qc = q->fd_qc;   
             ok = true;
             break;
@@ -105,24 +116,18 @@ void worker_desconectar_por_fd(int fd) {
         pthread_mutex_lock(&mutex_cola_exec);
         for (int i = 0; i < list_size(cola_exec); i++) {
             t_query* q = list_get(cola_exec, i);
-            if (q->QCB->qid == qid) {
+            if (q->QCB->QID == qid) {
                 list_remove(cola_exec, i);
                 pthread_mutex_unlock(&mutex_cola_exec);
 
                 log_warning(loggerMaster,
                     "Finalizando Query %d con error por desconexión del Worker %d",
-                    q->QCB->qid, w->id);
+                    q->QCB->QID, w->id);
 
                 // Notificar al QC solo con qid
                 t_paquete* paquete = crear_paquete();
-                paquete->codigo_operacion = QC_FIN_QUERY_ERROR; // tu opcode real
+                paquete->codigo_operacion = QUERY_FINALIZADA; // tu opcode real
                 agregar_a_paquete(paquete, &qid, sizeof(int));
-
-                if (enviar_paquete(paquete, q->QCB->fd_qc) == -1) {
-                    log_error(loggerMaster,
-                        "No se pudo notificar al QC (fd=%d) del fin con error de la Query %d",
-                        q->QCB->fd_qc, qid);
-                }
                 eliminar_paquete(paquete);
 
                 actualizarMetricas(Q_EXEC, Q_EXIT, q);
@@ -133,9 +138,6 @@ void worker_desconectar_por_fd(int fd) {
 
                 // ya no tiene nada en ejecución
                 w->qid_actual = -1;
-
-                // despertar planificador si quedó trabajo en READY
-                sem_post(&hay_query_ready);
                 return;
             }
         }
@@ -143,7 +145,7 @@ void worker_desconectar_por_fd(int fd) {
     }
 }
 
-void* atenderWorker(void arg){
+void* atenderWorker(void* arg){
   t_conexionWorker* conexionWorker =  (t_conexionWorker*) arg; 
 
   int fd = conexionWorker ->fd;
@@ -152,15 +154,15 @@ void* atenderWorker(void arg){
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
         log_warning(loggerMaster, "Worker %d: desconectado", id);
-        worker_marcar_desconectado_por_fd(fd);
+        worker_desconectar_por_fd(fd);
         break;
       }  
         
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
-            t_list* p = recibir_paquete(fd_worker);
+            t_list* p = recibir_paquete(fd);
             if (!p || list_size(p) < 2) {
-                log_error(loggerMaster, "Worker %d: RTA_DESALOJO mal formado", worker->id);
+                log_error(loggerMaster, "Worker %d: RTA_DESALOJO mal formado", conexionWorker->id);
                 if (p) list_destroy_and_destroy_elements(p, free);
                 break;
             }
@@ -173,8 +175,8 @@ void* atenderWorker(void arg){
             pthread_mutex_lock(&mutex_cola_ready);
             for (int i = 0; i < list_size(cola_ready); i++) {
                 t_query* q = list_get(cola_ready, i);
-                if (q->QCB->qid == qid) {
-                    q->QCB->pc = pc;
+                if (q->QCB->QID == qid) {
+                    q->QCB->PC = pc;
                     actualizado = 1;
                     break;
                 }
@@ -189,7 +191,7 @@ void* atenderWorker(void arg){
             }
 
             // 2) Despertar al hilo desalojar() para que envíe la nueva query
-            sem_post(&worker->semaforo);
+            sem_post(&conexionWorker->semaforo);
             break;
         }
         case OP_END: {
@@ -217,50 +219,38 @@ void* atenderWorker(void arg){
         case OP_READ: {
             // payload: [qid:int][n:int][bytes:n]
             t_list* p = recibir_paquete(fd);
-            if (list_size(p) < 3) {
+            if (!p || list_size(p) < 3) {
                 log_error(loggerMaster, "Worker %d: OP_READ mal formado", id);
-                list_destroy_and_destroy_elements(p, free);
+                if (p) list_destroy_and_destroy_elements(p, free);
                 break;
             }
+
             int qid = *(int*) list_get(p, 0);
             int n   = *(int*) list_get(p, 1);
+            void* src = list_get(p, 2);
+
             void* buf = malloc(n);
-            memcpy(buf, list_get(p, 2), n);
+            memcpy(buf, src, n);
             list_destroy_and_destroy_elements(p, free);
 
-            // 1) Verificamos que el el QID esté en ejecución
+            // 1) Verificar que el QID esté en EXEC y recuperar fd del QC
             int fd_qc = -1;
-
             if (!exec_buscar_por_qid(qid, &fd_qc)) {
                 log_warning(loggerMaster, "Worker %d: READ para QID=%d no encontrada en EXEC", id, qid);
                 free(buf);
                 break;
             }
 
-            // 2) Le mandamos el mensaje al Query_Control
+            // 2) Forward al Query Control
             t_paquete* out = crear_paquete();
-            out->codigo_operacion = MENSAJE_LECTURA;   // op code hacia el QC
+            out->codigo_operacion = MENSAJE_LECTURA;   // tu opcode hacia el QC
             agregar_a_paquete(out, &qid, sizeof(int));
             agregar_a_paquete(out, &n,   sizeof(int));
             agregar_a_paquete(out, buf,  n);
-
-            int rc = enviar_paquete(out, q->fd_qc);
+            enviar_paquete(out, fd_qc);
             eliminar_paquete(out);
             free(buf);
 
-            if (rc != 0) {
-                // 3) El QC está caído -> La QUERY tiene que ir a EXIT
-                log_warning(loggerMaster, "QID=%d: QC desconectado durante READ. Se cancela la query.", qid);
-                close(q->fd_qc);
-                q->fd_qc = -1;
-
-                // Sacamos a la query de Exec pidiendo el desalojo
-                // el hilo atender_worker va a recibir el PC y como el fd_qc == -1, NO va a reencolar a READY, finaliza la query.
-                enviar_preempt_a_worker(id, qid);
-
-                // Importante: no mandamos a EXIT acá a la query. Esperamos el PC del worker para cerrar limpio
-                // y liberar el slot del worker (sem_post(&workers_disponibles) en ese handler).
-            }
             // El worker sigue ejecutando; no se marca libre.
             break;
         }
@@ -293,5 +283,6 @@ void* atenderWorker(void arg){
             // Si el op desconocido tenía payload, tu worker está mandando cualquier cosa.
             break;
         }
+        return NULL;
     }
   }

@@ -35,8 +35,9 @@ void worker_desconectar_por_fd(int fd);
 int  workers_conectados(void);                // cantidad total en la lista
 int  workers_disponibles(void);               // qid_actual == -1
 
-void* atender_worker(void* arg);
+void* atenderWorker(void* arg);
 bool exec_buscar_por_qid(int qid, int* out_fd_qc);
-
+void worker_marcar_libre_por_fd(int fd);
+t_conexionWorker* encontrarWorkerPorQid(int qid);
 #endif /* T_CONEXIONWORKER_H_ */
 

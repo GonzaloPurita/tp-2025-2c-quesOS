@@ -5,13 +5,14 @@
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
 #include <utils/qcb.h>
+#include <utilsMaster/utilsPlanificacion.h>
 
 typedef enum { Q_READY, Q_EXEC, Q_EXIT } estado_query;
 
 extern uint64_t AGING_TICK_GLOBAL;
 
 typedef struct {
-    t_qcb* QCB; // PCB pero de Query
+    t_qcb* QCB; 
     char* path; // La ruta al archivo
     int prioridad; // La prioridad que tiene
     int IDAging; // Se explica en la parte de AGING
@@ -21,16 +22,14 @@ typedef struct {
     estado_query estado; // OPCIONAL: Podemos guardar el estado en el que esta.
 }t_query;
 
-t_query* crearQuery(char* path, int prioridad);
+t_query* crearQuery(const char* path, int prioridad);
 void destruirQuery(t_query* q);
+void agregarAReadyPorPrioridad(t_query* q);
+void actualizarMetricas(estado_query estadoActual, estado_query estadoNuevo, t_query* q);
 
 extern t_list* cola_ready;
 extern t_list*  cola_exec;
 extern t_list*  cola_exit;
 
-//AGING
-
-void* hilo_aging(void* arg);
-void aplicar_aging_ready(void);
 
 #endif /* T_QUERY_H_ */

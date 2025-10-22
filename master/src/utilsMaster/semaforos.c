@@ -1,4 +1,4 @@
-#include <semaforos.h>
+#include "semaforos.h"
 
 // --- Binarios ---
 sem_t sem_workers_disponibles; // Contador de workers libres

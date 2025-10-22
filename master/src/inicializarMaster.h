@@ -11,6 +11,5 @@ void cerrarConexionesMaster(void);
 
 void* recibirConexiones(void* arg);
 void* atenderCliente(void* arg);
-void* atender_worker(void* arg);
 
 #endif /* INICIALIZAR_MASTER_H_*/

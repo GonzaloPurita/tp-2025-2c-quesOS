@@ -59,7 +59,7 @@ void* atenderCliente(void* arg) {
             list_destroy_and_destroy_elements(datos, free);
 
             worker_registrar(worker_id, fd);
-            if (configMaster->tiempo_aging_ms > 0) {
+            if (configMaster->tiempo_aging > 0) {
                 pthread_t th_aging;
                 pthread_create(&th_aging, NULL, hilo_aging, NULL);
                 pthread_detach(th_aging);
@@ -78,7 +78,7 @@ void* atenderCliente(void* arg) {
             int* fd_ptr = malloc(sizeof(int));
             *fd_ptr = fd;
             pthread_t th;
-            pthread_create(&th, NULL, atender_worker, fd_ptr);
+            pthread_create(&th, NULL, atenderWorker, fd_ptr);
             pthread_detach(th);
 
             worker_marcar_libre_por_fd(fd);
@@ -99,7 +99,11 @@ void* atenderCliente(void* arg) {
                 close(fd);
                 return NULL;
             }
-                
+            
+            int prioridad = *(int*) list_get(datos, 0);
+            int len       = *(int*) list_get(datos, 1);
+            char* path_in = (char*) list_get(datos, 2);
+
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
 
@@ -117,14 +121,14 @@ void* atenderCliente(void* arg) {
                 return NULL;
             }
 
-            q->QCB->qid = qid;
-            q->QCB->pc  = 0;
+            q->QCB->QID = qid;
+            q->QCB->PC  = 0;
             q->fd_qc = fd;
 
             if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0){
-                mutex_lock(&mutex_cola_ready);
+                pthread_mutex_lock(&mutex_cola_ready);
                 list_add(cola_ready, q);
-                mutex_unlock(&mutex_cola_ready);
+                pthread_mutex_unlock(&mutex_cola_ready);
                 sem_post(&hay_query_ready);
             }
             else{
