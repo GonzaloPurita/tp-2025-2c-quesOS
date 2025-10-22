@@ -99,4 +99,14 @@ t_config* getMetaData(char* file, char* tag);
  */
 int obtenerBloqueFisico(char* file, char* tag, int numeroBloqueLogico);
 
+/**
+ * @brief Valida un bloque lógico, chequeando su contenido en el hashmap. En caso de encontrar un parecido cambia el hardlink.
+ * 
+ * @param nombreFile Nombre del archivo asociado al fileTag.
+ * @param nombreTag Nombre del Tag asociado al fileTag.
+ * @param numeroBloqueLogico Número del bloque lógico.
+ * @return El código de la operación que indica el resultado de la misma.
+ */
+op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico);
+
 #endif /* _FILETAGS_H */

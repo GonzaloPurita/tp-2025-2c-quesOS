@@ -5,8 +5,12 @@
 #include <utilsStorage/auxiliares.h>
 #include <sys/mman.h>
 #include <commons/bitarray.h>
+#include <commons/crypto.h>
+#include <utils/paquete.h>
 
 extern t_bitarray* bitmap; // Bitmap de bloques físicos
+// TODO: Inicializar este hashmap en algún lado
+extern t_config* hashMap; // Mapa de hashes de bloques físicos
 
 /**
  * @brief Busca el contenido de un bloque físico dado su número.
@@ -110,5 +114,13 @@ int contarHardlinks(const char *path);
  * @return true si el archivo tiene un único hardlink, false en caso contrario o error.
  */
 bool esHardlinkUnico(const char *path);
+
+/**
+ * @brief Obtiene el contenido de un bloque físico.
+ * 
+ * @param numeroBloqueFisico Numero del bloque físico.
+ * @return El contenido leido o NULL si hubo un error.
+ */
+char* leerBloqueFisico(int numeroBloqueFisico);
 
 #endif /* _BLOQUES_H_ */

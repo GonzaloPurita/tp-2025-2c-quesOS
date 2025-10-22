@@ -7,6 +7,7 @@ void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int 
 int contarElementos(char** array);
 void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos);
 op_code borrarTag(char* nombreFile, char* nombreTag);
+op_code commitTag(char* nombreFile, char* nombreTag);
 
 void crearFile(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
@@ -60,6 +61,13 @@ void eliminarTag(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     op_code resultado = borrarTag(nombreFile, nombreTag);
+    enviarRespuesta(resultado, socket_cliente);
+}
+
+void commit(t_list* data, int socket_cliente) {
+    char* nombreFile = list_get(data, 0);
+    char* nombreTag = list_get(data, 1);
+    op_code resultado = commitTag(nombreFile, nombreTag);
     enviarRespuesta(resultado, socket_cliente);
 }
 
@@ -191,6 +199,31 @@ op_code borrarTag(char* nombreFile, char* nombreTag) {
     borrar(pathTag);
     free(pathTag);
     string_array_destroy(blocks);
+
+    return OP_SUCCESS;
+}
+
+op_code commitTag(char* nombreFile, char* nombreTag) {
+    t_config* metadata = getMetaData(nombreFile, nombreTag);
+    if (metadata == NULL) {
+        return ERROR_FILE_NOT_FOUND;
+    }
+
+    char** blocks = config_get_array_value(metadata, "BLOCKS");
+    int bloquesActuales = contarElementos(blocks);
+
+    for (int i = 0; i < bloquesActuales; i++) {
+        op_code resultado = validarBloqueLogico(nombreFile, nombreTag, i);
+        if (resultado != OP_SUCCESS) {
+            string_array_destroy(blocks);
+            config_destroy(metadata);
+            return resultado;
+        }
+    }
+
+    config_set_value(metadata, "ESTADO", "COMMITED");
+    config_save(metadata);
+    config_destroy(metadata);
 
     return OP_SUCCESS;
 }

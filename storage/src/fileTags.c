@@ -350,3 +350,15 @@ op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag) {
 
     return OP_SUCCESS;
 }
+
+op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico) {
+    int bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
+    if (bloqueFisico == -1) {
+        log_error(loggerStorage, "Error validando bloque lógico %d de %s:%s, no existe bloque físico asociado", numeroBloqueLogico, nombreFile, nombreTag);
+        return ERROR_OUT_OF_BOUNDS;
+    }
+
+    char* contenido = leerBloqueFisico(bloqueFisico);
+    // TODO: Terminar
+    return OP_SUCCESS;
+}

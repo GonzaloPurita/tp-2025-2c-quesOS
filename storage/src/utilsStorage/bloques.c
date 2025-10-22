@@ -226,3 +226,36 @@ bool esHardlinkUnico(const char *path) {
     // Si st_nlink == 1, solo existe este enlace
     return (file_stat.st_nlink == 1);
 }
+
+char* leerBloqueFisico(int numeroBloqueFisico) {
+    if (!bloqueFisicoValido(numeroBloqueFisico)) return NULL;
+
+    char* rutaBloque = rutaBloqueFisico(numeroBloqueFisico);
+    FILE* bloque = fopen(rutaBloque, "rb");
+    if (bloque == NULL) {
+        log_error(loggerStorage, "Error abriendo el bloque físico %s para lectura", rutaBloque);
+        free(rutaBloque);
+        return NULL;
+    }
+
+    char* datos = malloc(superblock->blocksize);
+    if (datos == NULL) {
+        log_error(loggerStorage, "Error leyendo bloque físico %s, no se pudo reservar memoria", rutaBloque);
+        fclose(bloque);
+        free(rutaBloque);
+        return NULL;
+    }
+
+    size_t elementosLeidos = fread(datos, superblock->blocksize, 1, bloque);
+    if (elementosLeidos != 1) {
+        log_error(loggerStorage, "Error leyendo del bloque físico %s", rutaBloque);
+        free(datos);
+        fclose(bloque);
+        free(rutaBloque);
+        return NULL;
+    }
+
+    fclose(bloque);
+    free(rutaBloque);
+    return datos;
+}
