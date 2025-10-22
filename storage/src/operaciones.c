@@ -8,6 +8,7 @@ int contarElementos(char** array);
 void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos);
 op_code borrarTag(char* nombreFile, char* nombreTag);
 op_code commitTag(char* nombreFile, char* nombreTag);
+op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido);
 
 void crearFile(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
@@ -68,6 +69,16 @@ void commit(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     op_code resultado = commitTag(nombreFile, nombreTag);
+    enviarRespuesta(resultado, socket_cliente);
+}
+
+void writeFileTag(t_list* data, int socket_cliente) {
+    char* nombreFile = list_get(data, 0);
+    char* nombreTag = list_get(data, 1);
+    int nroBloqueLogico = *((int*) list_get(data, 2));
+    void* contenido = list_get(data, 3);
+    size_t sizeContenido = *((size_t*) list_get(data, 4));
+    op_code resultado = escribirBloqueLogico(nombreFile, nombreTag, nroBloqueLogico, contenido, sizeContenido);
     enviarRespuesta(resultado, socket_cliente);
 }
 
@@ -226,4 +237,81 @@ op_code commitTag(char* nombreFile, char* nombreTag) {
     config_destroy(metadata);
 
     return OP_SUCCESS;
+}
+
+op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* datos, size_t sizeDatos) {
+    // Validación de datos
+    if (nombreFile == NULL || nombreTag == NULL) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, el nombre del file o del tag es NULL");
+        return OP_FAILED;
+    }
+    if (string_is_empty(nombreFile) || string_is_empty(nombreTag)) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, el nombre del file o del tag está vacío");
+        return OP_FAILED;
+    }
+    if (numeroBloqueLogico < 0) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, el número de bloque lógico es negativo");
+        return OP_FAILED;
+    }
+    if (datos == NULL) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, los datos a escribir son NULL");
+        return OP_FAILED;
+    }
+    if (sizeDatos == 0 || sizeDatos > superblock->blocksize) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, el tamaño de los datos es inválido");
+        return ERROR_OUT_OF_BOUNDS;
+    }
+
+    // Obtener metadata
+    t_config* metadata = getMetaData(nombreFile, nombreTag);
+    if (metadata == NULL) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, no se encontró el FileTag %s:%s", nombreFile, nombreTag);
+        return ERROR_FILE_NOT_FOUND;
+    }
+
+    // Verificar estado
+    if (strcmp("COMMITED", config_get_string_value(metadata, "ESTADO")) == 0) {
+        log_error(loggerStorage, "Error escribiendo bloque lógico, el FileTag %s:%s está COMMITED", nombreFile, nombreTag);
+        config_destroy(metadata);
+        return ERROR_WRITE_NOT_ALLOWED;
+    }
+
+    // Ruta al bloque lógico
+    char* pathBloqueLogico = rutaFileTag(nombreFile, nombreTag);
+    string_append(&pathBloqueLogico, "/logical_blocks/");
+    char* nombreBloqueLogico = crearNombreBloque(numeroBloqueLogico);
+    string_append(&pathBloqueLogico, nombreBloqueLogico);
+    free(nombreBloqueLogico);
+
+    int bloqueFisico;
+    if(esHardlinkUnico(pathBloqueLogico)) {
+        bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
+    } else {
+        // El bloque tiene mas de un Hardlink -> Le asigno uno nuevo
+        bloqueFisico = obtenerBloqueLibre();
+        if (bloqueFisico == -1) {
+            free(pathBloqueLogico);
+            config_destroy(metadata);
+            return ERROR_NO_SPACE;
+        }
+        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico)) {
+            free(pathBloqueLogico);
+            config_destroy(metadata);
+            return OP_FAILED;
+        }
+        if (!crearHardlink(pathBloqueLogico, numeroBloqueLogico, bloqueFisico)) {
+            free(pathBloqueLogico);
+            config_destroy(metadata);
+            return OP_FAILED;
+        }
+    }
+    if(escribirBloqueFisico(bloqueFisico, datos, sizeDatos, false)) {
+        free(pathBloqueLogico);
+        config_destroy(metadata);
+        return OP_SUCCESS;
+    } else { // TODO: Quizas estaría bueno que devuelva mas info, pero mucho refactor zzz
+        free(pathBloqueLogico);
+        config_destroy(metadata);
+        return OP_FAILED;
+    }
 }

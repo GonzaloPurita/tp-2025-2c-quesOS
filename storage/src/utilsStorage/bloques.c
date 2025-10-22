@@ -220,11 +220,11 @@ bool esHardlinkUnico(const char *path) {
     
     if (stat(path, &file_stat) == -1) {
         perror("stat");
-        return -1;
+        return false;
     }
     
     // Si st_nlink == 1, solo existe este enlace
-    return (file_stat.st_nlink == 1);
+    return (file_stat.st_nlink <= 2); // Considero 2 porque el primer hardlink es el archivo en sí mismo
 }
 
 char* leerBloqueFisico(int numeroBloqueFisico) {

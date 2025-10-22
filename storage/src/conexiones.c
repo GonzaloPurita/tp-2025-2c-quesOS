@@ -38,6 +38,7 @@ void recibirCliente(void* cliente) {
 
     while(1) {
         op_code cod = recibir_operacion(socket_cliente);
+        sleep(configStorage->retardo_operacion * 1000); // Simulo retardo de operacion
         log_debug(loggerStorage, "Operacion recibida: %d", cod);
         switch(cod) {
             case TAMANIO_BLOQUE: {
