@@ -30,7 +30,7 @@ typedef enum {
 extern t_config_storage* configStorage;
 extern t_superblock* superblock;
 extern t_log* loggerStorage;
-// TODO: Inicializar este hashmap en algún lado
+// TODO: Implementar semáforos para el hashMap
 extern t_config* hashMap; // Mapa de hashes de bloques físicos
 
 /**

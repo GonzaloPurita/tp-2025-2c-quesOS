@@ -8,6 +8,7 @@
 #include <commons/crypto.h>
 #include <utils/paquete.h>
 
+// TODO: Implementar con mutex --> Directamente en las funciones que usan el bitmap
 extern t_bitarray* bitmap; // Bitmap de bloques físicos
 
 /**

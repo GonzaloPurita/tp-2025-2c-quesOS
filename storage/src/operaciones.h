@@ -68,4 +68,28 @@ void eliminarTag(t_list* data, int socket_cliente);
  */
 void commit(t_list* data, int socket_cliente);
 
+/**
+ * @brief Escribe datos en un bloque lógico de un archivo y etiqueta (tag) en el sistema de almacenamiento.
+ *
+ * Esta función escribe los datos proporcionados en un bloque lógico específico
+ * de un archivo y etiqueta (tag) utilizando los datos en la lista `data`. Además,
+ * envía una respuesta al cliente a través del socket especificado.
+ *
+ * @param data Lista de datos necesarios para escribir en el bloque lógico.
+ * @param socket_cliente Descriptor del socket del cliente para enviar la respuesta.
+ */
+void writeFileTag(t_list* data, int socket_cliente);
+
+/**
+ * @brief Lee datos de un bloque lógico de un archivo y etiqueta (tag) en el sistema de almacenamiento.
+ *
+ * Esta función lee los datos de un bloque lógico específico de un archivo y etiqueta (tag)
+ * utilizando los datos en la lista `data`. Además, envía una respuesta al cliente a través
+ * del socket especificado.
+ *
+ * @param data Lista de datos necesarios para leer del bloque lógico.
+ * @param socket_cliente Descriptor del socket del cliente para enviar la respuesta.
+ */
+void readBloqueLogico(t_list* data, int socket_cliente);
+
 #endif // _OPERACIONES_H

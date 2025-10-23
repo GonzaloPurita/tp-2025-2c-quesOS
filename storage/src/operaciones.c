@@ -82,6 +82,37 @@ void writeFileTag(t_list* data, int socket_cliente) {
     enviarRespuesta(resultado, socket_cliente);
 }
 
+void readBloqueLogico(t_list* data, int socket_cliente) {
+    char* nombreFile = list_get(data, 0);
+    char* nombreTag = list_get(data, 1);
+    int nroBloqueLogico = *((int*) list_get(data, 2));
+
+    t_config *metadata = getMetaData(nombreFile, nombreTag);
+    if (metadata == NULL) {
+        enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
+        return;
+    }
+
+    int nroBloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, nroBloqueLogico);
+    if (nroBloqueFisico == -1) {
+        enviarRespuesta(ERROR_OUT_OF_BOUNDS, socket_cliente);
+        return;
+    }
+
+    char* datos = leerBloqueFisico(nroBloqueFisico);
+    if (datos == NULL) {
+        enviarRespuesta(OP_FAILED, socket_cliente);
+        return;
+    }
+
+    t_paquete* paqueteRespuesta = crear_paquete();
+    paqueteRespuesta->codigo_operacion = OP_SUCCESS;
+    agregar_a_paquete(paqueteRespuesta, datos, superblock->blocksize);
+    enviar_paquete(paqueteRespuesta, socket_cliente);
+    eliminar_paquete(paqueteRespuesta);
+    free(datos);
+}
+
 // Privados - Implementaciones
 void enviarRespuesta(op_code codigo, int socket_cliente) {
     t_paquete* paqueteRespuesta = crear_paquete();
