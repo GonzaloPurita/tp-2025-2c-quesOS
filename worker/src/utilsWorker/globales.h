@@ -5,6 +5,7 @@
 #include <commons/collections/dictionary.h>
 #include <commons/log.h>
 #include "estructuras_memoria.h"
+#include <semaphore.h>
 
 typedef struct t_config_worker t_config_worker;
 // typedef struct frame frame;
@@ -41,6 +42,9 @@ extern t_dictionary* diccionario_tablas;
 /* querys */
 extern int PC_ACTUAL;
 extern int TAM_BLOQUE;
+
+// /* semaforos */
+extern sem_t mutex_memoria;
 
 extern int puntero_clock;
 

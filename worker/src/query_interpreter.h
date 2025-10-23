@@ -1,13 +1,13 @@
 #ifndef QUERY_INTERPRETER_H_
 #define QUERY_INTERPRETER_H_
 
-#include "query_interpreter.h"
 #include "utilsWorker/api_memoria.h"
 #include "utilsWorker/configWorker.h"
 #include <utilsWorker/globales.h>
 #include <commons/string.h>
 #include <unistd.h>
 #include <utils/paquete.h>
+#include <utilsWorker/globales.h>
 
 typedef enum {
     CREATE,

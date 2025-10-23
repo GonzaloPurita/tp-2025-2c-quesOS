@@ -21,8 +21,23 @@ void recibir_queries(){
 
             // El Master envía: [query_id, nombre_query, pc_inicial]
             int* query_id = list_get(paquete, 0);
+            if(query_id == NULL) {
+                log_error(loggerWorker, "Error: ID de query inválido recibido.");
+                list_destroy(paquete);
+                return;
+            }
             char* nombre_query = list_get(paquete, 1);
+            if(nombre_query == NULL) {
+                log_error(loggerWorker, "Error: Nombre de query inválido recibido.");
+                list_destroy(paquete);
+                return;
+            }
             int* pc_inicial = list_get(paquete, 2);
+            if(pc_inicial == NULL) {
+                log_error(loggerWorker, "Error: PC inicial inválido recibido.");
+                list_destroy(paquete);
+                return;
+            }
 
             // Crear contexto global
             query_actual = malloc(sizeof(t_query_context));
@@ -490,6 +505,7 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
 }
 
 void guardar_paginas_modificadas() {
+    sem_wait(&mutex_memoria);
     for (int i = 0; i < CANTIDAD_MARCOS; i++) {
         frame* f = &frames[i]; // uso un frame* porque asi puedo usar la -> para acceder a los campos
 
@@ -516,6 +532,7 @@ void guardar_paginas_modificadas() {
             free(contenido);
         }
     }
+    sem_post(&mutex_memoria);
     log_debug(loggerWorker, "Finalizado guardado de páginas modificadas.");
 }
 
@@ -577,10 +594,13 @@ void notificar_error_a_master(char* motivo) {
 // --- Para liberar memoria --- //
 
 void destruir_instruccion(t_instruccion* inst) {
-    for (int i = 0; i < inst->num_parametros; i++) {
-        free(inst->parametros[i]);
+    if (!inst) return;
+    if (inst->parametros) {
+        for (int i = 0; i < inst->num_parametros; i++) {
+            if (inst->parametros[i]) free(inst->parametros[i]);
+        }
+        free(inst->parametros);
     }
-    free(inst->parametros);
     free(inst);
 }
 

@@ -26,6 +26,8 @@ int puntero_clock = 0;
 
 frame* frames;
 
+sem_t mutex_memoria;
+
 // Diccionarios
 t_dictionary* diccionario_tablas; // clave = "file:tag", valor = tabla_pag*
 
@@ -41,6 +43,8 @@ void iniciar_memoria(){
     }
 
     frames = calloc(CANTIDAD_MARCOS, sizeof(frame));
+
+    sem_init(&mutex_memoria, 0, 1);
 
     log_debug(loggerWorker, "Memoria interna inicializada. TAM_MEMORIA=%d, TAM_PAGINA=%d, MARCOS=%d", TAM_MEMORIA, TAM_PAGINA, CANTIDAD_MARCOS);
 }
