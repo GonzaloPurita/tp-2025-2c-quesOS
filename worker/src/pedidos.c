@@ -24,19 +24,35 @@ void pedir_tamanio_de_bloque(){
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
+
+    if (lista == NULL) {
+        log_error(loggerWorker, "Error: recibir_paquete devolvió NULL");
+        return;
+    }
         
     if (list_size(lista) < 1) {
         log_error(loggerWorker, "Error al recibir el tamanio de bloque");
-        list_destroy(lista);
+        list_destroy_and_destroy_elements(lista, free);
         return;
     }
 
-    if (list_get(lista, 0) <= 0) {
-        log_error(loggerWorker, "Handshake con Storage falló. No se pudo obtener TAM_BLOQUE: %d.", TAM_BLOQUE);
+    int* p_tam_bloque = (int*) list_get(lista, 0);
+
+    if (p_tam_bloque == NULL) {
+        log_error(loggerWorker, "Error: puntero nulo en paquete recibido");
+        list_destroy_and_destroy_elements(lista, free);
+        return;
+    }
+
+    int recibido = *p_tam_bloque;
+
+    if (recibido <= 0) {
+        log_error(loggerWorker, "Handshake con Storage falló. TAM_BLOQUE inválido: %d.", recibido);
+        list_destroy_and_destroy_elements(lista, free);
         exit(EXIT_FAILURE);
     }
 
-    memcpy(&TAM_BLOQUE, list_get(lista, 0), sizeof(int)); // es global 
+    TAM_BLOQUE = recibido;
 
     log_info(loggerWorker, "Handshake con Storage exitoso. TAM_BLOQUE: %d.", TAM_BLOQUE);
 
@@ -47,7 +63,7 @@ int enviar_identificador_a_master(char* id) {
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = ID_WORKER;
 
-    agregar_a_paquete(paquete, id, sizeof(int));
+    agregar_a_paquete(paquete, id, strlen(id)+1);
     enviar_paquete(paquete, conexionMaster);
     eliminar_paquete(paquete);
 
@@ -56,8 +72,18 @@ int enviar_identificador_a_master(char* id) {
         log_error(loggerWorker, "Error: esperaba ID_WORKER y llegó %d", cod_op);
         return -1;
     }
+
     t_list* lista_paquete = recibir_paquete(conexionMaster);
-    int result = *(int*) list_get(lista_paquete, 0);
+    if (!lista_paquete || list_size(lista_paquete) < 1) {
+        log_error(loggerWorker, "Error: paquete de respuesta de master inválido");
+        if (lista_paquete) list_destroy_and_destroy_elements(lista_paquete, free);
+        return -1;
+    }
+    
+    int* p_result = (int*) list_get(lista_paquete, 0);
+    int result = (p_result != NULL) ? *p_result : -1;
+
+    list_destroy_and_destroy_elements(lista_paquete, free);
 
 	return result;
 }
