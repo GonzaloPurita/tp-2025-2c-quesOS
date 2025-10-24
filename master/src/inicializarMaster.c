@@ -19,7 +19,7 @@ void iniciarConexionesMaster() {
 
     pthread_t hilo;
     pthread_create(&hilo, NULL, (void*) recibirConexiones, NULL);
-    pthread_detach(hilo);
+    pthread_join(hilo, NULL);
 }
 
 void cerrarConexionesMaster() {
@@ -56,8 +56,7 @@ void* atenderCliente(void* arg) {
                 return NULL;
             }
 
-            int worker_id = 0;
-            memcpy(&worker_id, list_get(datos, 0), sizeof(int));
+            int worker_id = *(int*) list_get(datos, 0);
             list_destroy_and_destroy_elements(datos, free);
 
             worker_registrar(worker_id, fd);
@@ -113,10 +112,11 @@ void* atenderCliente(void* arg) {
             t_query* q = crearQuery(path_dup, prioridad);
             if (!q) {
                 log_error(loggerMaster, "No se pudo crear la query (prio=%d)", prioridad);
+                free(path_dup);
                 close(fd);
                 return NULL;
             }
-
+            free(path_dup);
             q->QCB->QID = qid;
             q->QCB->PC  = 0;
             q->fd_qc = fd;
