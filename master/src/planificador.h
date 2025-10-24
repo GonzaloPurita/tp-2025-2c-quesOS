@@ -13,6 +13,7 @@ typedef struct {
     t_conexionWorker* worker;     // Worker donde está ejecutando el candidato
 } t_datos_desalojo;
 
+void planificador_lanzar(void);
 void planificarSinDesalojo();
 void planificarConDesalojoYAging();
 void* planificador(void* arg);

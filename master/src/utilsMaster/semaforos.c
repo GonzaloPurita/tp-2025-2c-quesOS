@@ -25,4 +25,14 @@ void inicializarSemaforos(void) {
     sem_init(&hay_query_ready, 0, 0);
 }
 
-//TODO: destruirSemaforos()
+void destruirSemaforos(void) {
+    sem_destroy(&sem_workers_disponibles);
+    sem_destroy(&hay_query_ready);
+
+    pthread_mutex_destroy(&mutex_workers);
+    pthread_mutex_destroy(&mutex_qid);
+    pthread_mutex_destroy(&mutex_cola_ready);
+    pthread_mutex_destroy(&mutex_cola_exec);
+    pthread_mutex_destroy(&mutex_cola_exit);
+    pthread_mutex_destroy(&mutex_queries);
+}

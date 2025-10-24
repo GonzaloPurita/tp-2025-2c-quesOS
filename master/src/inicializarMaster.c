@@ -5,6 +5,7 @@ static int NEXT_QID = 0;
 
 void* recibirConexiones(void* arg);
 void* atenderCliente(void* arg);
+static int aging_started = 0;
 
 void iniciarConexionesMaster() {
     char* puerto = string_itoa(configMaster->puerto_escucha);
@@ -12,6 +13,7 @@ void iniciarConexionesMaster() {
     free(puerto);
     inicializarSemaforos();
     workers_iniciar();
+    planificador_lanzar();
 
     log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
 
@@ -59,13 +61,14 @@ void* atenderCliente(void* arg) {
             list_destroy_and_destroy_elements(datos, free);
 
             worker_registrar(worker_id, fd);
-            if (configMaster->tiempo_aging > 0) {
+            if (configMaster->tiempo_aging > 0 && !aging_started) {
+                aging_started=1;
                 pthread_t th_aging;
                 pthread_create(&th_aging, NULL, hilo_aging, NULL);
                 pthread_detach(th_aging);
             }
 
-            // ACK y a otra cosa
+            // HS
             int ok = 1;
             t_paquete* r = crear_paquete();
             r->codigo_operacion = RTA_ID_WORKER;
@@ -74,13 +77,6 @@ void* atenderCliente(void* arg) {
             eliminar_paquete(r);
 
             log_info(loggerMaster, "Workers conectados=%d, disponibles=%d", workers_conectados(), workers_disponibles());
-
-            int* fd_ptr = malloc(sizeof(int));
-            *fd_ptr = fd;
-            pthread_t th;
-            pthread_create(&th, NULL, atenderWorker, fd_ptr);
-            pthread_detach(th);
-
             worker_marcar_libre_por_fd(fd);
             sem_post(&sem_workers_disponibles);
 
@@ -146,7 +142,6 @@ void* atenderCliente(void* arg) {
             eliminar_paquete(r);
 
             // NO cerrar fd. Queda asociado a esta query para reenviar las operaciones de worker
-            // Este hilo termina; otros hilos usarán q->QCB->fd_qc para escribirle al QC.
             return NULL;
         }
 

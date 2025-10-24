@@ -36,8 +36,6 @@ void aplicar_aging_ready(void) {
 
     if (hubo_cambios) {
         //TODO: chequear que respete orden de llegada entre iguales y sino cambiar por list_add_index
-        // Reordenar READY por prioridad actual (0 mejor). Sin inventos.
-        // VER QUE FUNCION USAR, SI LA BOOLEANA O ESTA.
         list_sort(cola_ready, cmp_query_por_prioridad);
     }
 

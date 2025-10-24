@@ -5,6 +5,7 @@
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
 #include <utils/paquete.h>
+#include <planificador.h>
 
 void iniciarConexionesMaster(void);
 void cerrarConexionesMaster(void);

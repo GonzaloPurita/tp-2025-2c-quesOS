@@ -11,6 +11,13 @@ void* planificador(void* arg) {
   return NULL;
 }
 
+void planificador_lanzar(void) {
+    pthread_t th_planificador;
+    pthread_create(&th_planificador, NULL, planificador, NULL);
+    pthread_detach(th_planificador);
+    log_info(loggerMaster, "Hilo planificador iniciado");
+}
+
 void planificarConDesalojoYAging() {
   while (1) {
     sem_wait(&hay_query_ready);
@@ -66,7 +73,7 @@ void planificarConDesalojoYAging() {
         log_debug(loggerMaster, "Desalojo por prioridad");
         realizarDesalojo(candidatoDesalojo, query);
     }
-    // Si no es mejor, no hacemos nada y esperamos próximo evento (aging, worker libre, otra query).
+
   }
 }
 void planificarSinDesalojo() {
@@ -149,7 +156,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
 
     pthread_mutex_lock(&mutex_cola_ready);
     list_remove_element(cola_ready, nuevoQuery);
-    // reinsertar candidato en READY manteniendo orden por prioridad
+    // reinsertamos a ready manteniendo prioridad
     agregarAReadyPorPrioridad(candidatoDesalojo);
     pthread_mutex_unlock(&mutex_cola_ready);
 
@@ -161,7 +168,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     datos->candidatoDesalojo = candidatoDesalojo;
     datos->nuevoQuery = nuevoQuery;
 
-    // Buscamos el worker donde corre el candidato 
+    // buscamos el worker en el que está ejecutando la query
     datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->QID);
     if (datos->worker == NULL) {
         log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->QID);
@@ -169,7 +176,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
         return;
     }
 
-    // 4) Lanzar hilo que hace el PREEMPT bloqueante
+    // 4) Lanzar hilo que hace el prempteo
     pthread_t hiloDesalojo;
     pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
     pthread_detach(hiloDesalojo);
@@ -178,17 +185,17 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
 void* desalojar(void* arg) {
     t_datos_desalojo* d = (t_datos_desalojo*) arg;
 
-    // A) Pedir PREEMPT al worker del candidato
+    // A) Pedimos el preempt al worker
     t_paquete* p = crear_paquete();
     p->codigo_operacion = DESALOJO;
     agregar_a_paquete(p, &d->candidatoDesalojo->QCB->QID, sizeof(int));
     enviar_paquete(p, d->worker->fd);
     eliminar_paquete(p);
 
-   // B) Esperar RTA_DESALOJO: el hilo atender_worker hará sem_post(&worker->semaforo)
+   // B) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
     sem_wait(&d->worker->semaforo);
 
-    // C) Enviar la NUEVA query a ese mismo worker
+    // C) Mandamos la query nueva a ese worker
     enviarQueryAWorkerEspecifico(d->nuevoQuery, d->worker);
 
     free(d);
