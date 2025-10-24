@@ -1,3 +1,5 @@
+#include "qcb.h"
+
 static int GlobalQID = 0;
 static pthread_mutex_t mutexQID = PTHREAD_MUTEX_INITIALIZER;
 

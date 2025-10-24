@@ -1,7 +1,15 @@
-#include <pthread.h>
+#ifndef QCB_H_
+#define QCB_H_
+
+
+#include <stdio.h>
 #include <stdlib.h>
-#include <commons/collections/list.h> // por si usás recibir_paquete de commons
-#include <utils/paquete.h>           // tu utils con opcodes y paquetes
+#include <commons/log.h>
+#include <commons/config.h>
+#include <pthread.h>
+#include <commons/collections/list.h> 
+#include <utils/paquete.h>     
+#include <semaphore.h>      
 
 typedef struct {
     int QID; // Query ID autoincremental
@@ -17,3 +25,5 @@ t_qcb* recibirQCB(int conexion);
 
 /* Destroy */
 void destruirQCB(t_qcb* qcb);
+
+#endif /* QCB_H_ */
