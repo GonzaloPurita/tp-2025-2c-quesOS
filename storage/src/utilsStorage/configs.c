@@ -6,10 +6,15 @@ t_superblock* superblock;
 t_log* loggerStorage;
 t_config* hashMap; 
 
-void inicializarConfigStorage() {
+void inicializarConfigStorage(char* archivoConfiguracion) {
     configStorage = malloc(sizeof(t_config_storage));
-    t_config* config = config_create("storage.config");
+    t_config* config = config_create(archivoConfiguracion);
 
+    if (config == NULL) {
+        fprintf(stderr, "Error: No se pudo cargar el archivo de configuración: %s\n", archivoConfiguracion);
+        exit(EXIT_FAILURE); // Terminar el programa si no se puede cargar el archivo
+
+    }
     // Strings
     configStorage->punto_montaje = strdup(config_get_string_value(config, "PUNTO_MONTAJE"));
     configStorage->log_level = strdup(config_get_string_value(config, "LOG_LEVEL"));
@@ -92,8 +97,8 @@ void incializarHashMap() {
     free(ruta);
 }
 
-void inicializarConfigs() {
-    inicializarConfigStorage();
+void inicializarConfigs(char* archivoConfiguracion) {
+    inicializarConfigStorage(archivoConfiguracion);
     incializarSuperblock();
     // incializarHashMap(); // Mover a inicializarFS, post formateo/carga
 }

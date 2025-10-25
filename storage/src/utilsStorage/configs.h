@@ -41,7 +41,7 @@ extern t_config* hashMap; // Mapa de hashes de bloques físicos
  * llamada antes de utilizar cualquier funcionalidad que dependa de estas
  * configuraciones.
  */
-void inicializarConfigs();
+void inicializarConfigs(char* archivoConfiguracion);
 
 /**
  * @brief Libera los recursos asignados para la configuración.
@@ -68,5 +68,7 @@ char* estadoToString(t_estado_fileTag estado);
  * y asignar el puntero global hashMap para su uso.
  */
 void incializarHashMap();
+
+void inicializarConfigStorage(char* archivoConfiguracion);
 
 #endif

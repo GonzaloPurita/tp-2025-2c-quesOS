@@ -166,7 +166,7 @@ void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int 
 
     if (error) {
         // Restaurar bloques eliminados previamente
-        // TODO: Restauración?
+        // TODO: Restauración?S
         log_error(loggerStorage, "Error al reducir el FileTag %s:%s", nombreFile, nombreTag);
         enviarRespuesta(OP_FAILED, socket_cliente);
     } else {
