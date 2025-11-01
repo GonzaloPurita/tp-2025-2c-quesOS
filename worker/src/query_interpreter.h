@@ -28,6 +28,14 @@ typedef struct {
     int num_parametros;
 } t_instruccion;
 
+typedef struct {
+    int index_frame;
+    char* file;
+    char* tag;
+    int page_num;
+    void* contenido;
+} t_pagina_a_guardar;
+
 // typedef struct{ // MATERIAS:BASE
 //     char* file_name; //ej: "MATERIAS"
 //     char* tag; //ej "BASE"

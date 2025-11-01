@@ -35,10 +35,20 @@ int main(int argc, char* argv[]) {
 void* listener_master() {
     while (1) {
         int op = recibir_operacion(conexionMaster);
+
+        if (op <= 0) {
+            log_error(loggerWorker, "Master desconectado o error en recibir_operacion (op=%d). Cerrando listener.", op);
+            close(conexionMaster);
+            break;
+        }
+
         if (op == DESALOJO) {
             log_debug(loggerWorker, "Master pidió desalojo");
             atomic_store(&interrupt_flag, 1);
+        } else {
+            log_debug(loggerWorker, "Listener Master recibió op desconocida: %d", op);
         }
     }
+
     return NULL;
 }

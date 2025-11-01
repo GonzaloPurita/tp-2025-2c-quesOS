@@ -505,34 +505,52 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
 }
 
 void guardar_paginas_modificadas() {
+    t_list* paginas = list_create();
+
+    // Obtengo las páginas modificadas
     sem_wait(&mutex_memoria);
     for (int i = 0; i < CANTIDAD_MARCOS; i++) {
-        frame* f = &frames[i]; // uso un frame* porque asi puedo usar la -> para acceder a los campos
-
+        frame* f = &frames[i];
         if (f->ocupado && f->modificado) {
+            t_pagina_a_guardar* p = malloc(sizeof(t_pagina_a_guardar));
+            p->index_frame = i;
+            p->file = strdup(f->file);
+            p->tag = strdup(f->tag);
+            p->page_num = f->page_num;
+
             int base_memoria = i * TAM_PAGINA;
-            char* contenido = malloc(TAM_PAGINA);
-            memcpy(contenido, MEMORIA + base_memoria, TAM_PAGINA);
+            p->contenido = malloc(TAM_PAGINA);
+            memcpy(p->contenido, MEMORIA + base_memoria, TAM_PAGINA);
 
-            t_paquete* paquete = crear_paquete();
-            paquete->codigo_operacion = GUARDAR_MODIFICADAS;
-
-            agregar_a_paquete(paquete, f->file, strlen(f->file) + 1);
-            agregar_a_paquete(paquete, f->tag, strlen(f->tag) + 1);
-            agregar_a_paquete(paquete, &f->page_num, sizeof(int));
-            agregar_a_paquete(paquete, contenido, TAM_PAGINA);
-
-            enviar_paquete(paquete, conexionStorage);
-            eliminar_paquete(paquete);
-
-            log_debug(loggerWorker, "Página modificada guardada en Storage: %s:%s - pagina %d (marco %d)", f->file, f->tag, f->page_num, i);
-
-            f->modificado = false;
-
-            free(contenido);
+            list_add(paginas, p);
         }
     }
     sem_post(&mutex_memoria);
+
+    // Enviar a Storage
+    for (int i = 0; i < list_size(paginas); i++) {
+        t_pagina_a_guardar* p = list_get(paginas, i);
+
+        t_paquete* paquete = crear_paquete();
+        agregar_a_paquete(paquete, p->file, strlen(p->file) + 1);
+        agregar_a_paquete(paquete, p->tag, strlen(p->tag) + 1);
+        agregar_a_paquete(paquete, &p->page_num, sizeof(int));
+        agregar_a_paquete(paquete, p->contenido, TAM_PAGINA);
+
+        enviar_paquete(paquete, conexionStorage);
+        eliminar_paquete(paquete);
+
+        sem_wait(&mutex_memoria);
+        frames[p->index_frame].modificado = false;
+        sem_post(&mutex_memoria);
+
+        free(p->file);
+        free(p->tag);
+        free(p->contenido);
+        free(p);
+    }
+
+    list_destroy(paginas);
     log_debug(loggerWorker, "Finalizado guardado de páginas modificadas.");
 }
 
