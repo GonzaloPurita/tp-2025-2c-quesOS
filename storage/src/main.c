@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
     printf("Intentando cargar el archivo de configuración: %s\n", archivoConfiguracion);
     
     inicializarConfigStorage(archivoConfiguracion);
-    inicializarFS();
+    inicializarFS(archivoConfiguracion);
     iniciarServidor();
     return 0;
 }

@@ -14,6 +14,6 @@
  * internas, la inicialización de bloques de memoria, y cualquier otra 
  * tarea requerida para el correcto funcionamiento del sistema de archivos.
  */
-void inicializarFS();
+void inicializarFS(char* archivoConfiguracion);
 
 #endif

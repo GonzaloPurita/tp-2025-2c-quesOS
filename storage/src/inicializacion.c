@@ -5,8 +5,8 @@ void formatearFS();
 void crearRutaFiles();
 void crearBloques();
 
-void inicializarFS() {
-    inicializarConfigs();
+void inicializarFS(char* archivoConfiguracion) {
+    inicializarConfigs(archivoConfiguracion);
     log_info(loggerStorage, "Storage iniciado");
     if (configStorage->fresh_start) { // Hay que generar todo
         formatearFS();
