@@ -35,8 +35,9 @@ void recibirCliente(void* cliente) {
 
     t_list* datosRecibidos = NULL;
     t_paquete* datosEnviados = NULL;
-
+    log_info(loggerStorage, "Entre a recibirCliente()");
     while(1) {
+        log_info(loggerStorage, "Esperando peticiones del Worker...");
         op_code cod = recibir_operacion(socket_cliente);
         sleep(configStorage->retardo_operacion * 1000); // Simulo retardo de operacion
         log_debug(loggerStorage, "Operacion recibida: %d", cod);
@@ -58,6 +59,7 @@ void recibirCliente(void* cliente) {
             }
             case OP_TAG: {
                 tag(datosRecibidos, socket_cliente);
+
                 break;
             }
             case OP_DELETE: {
