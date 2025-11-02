@@ -26,7 +26,7 @@ typedef struct {
 void workers_iniciar(void);
 
 // Altas/bajas
-void worker_registrar(char* id, int fd);
+int worker_registrar(char* id, int fd);
 void worker_desconectar_por_fd(int fd);
 
 // Estado de ejecución

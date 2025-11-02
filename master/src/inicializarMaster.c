@@ -50,7 +50,6 @@ void* atenderCliente(void* arg) {
     int fd = *((int*) arg);
     free(arg);
 
-    log_info(loggerMaster, "Antes de reibir operacion");
     op_code cod = recibir_operacion(fd);
     log_info(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
 
@@ -64,45 +63,59 @@ void* atenderCliente(void* arg) {
                 close(fd);
                 return NULL;
             }
-
+        
             char* raw_worker_id = list_get(datos, 0);
-            char* worker_id = strdup(raw_worker_id);
-
-            list_destroy_and_destroy_elements(datos, free);
-
-            if (!worker_id) {
-                log_error(loggerMaster, "Error al duplicar worker_id recibido en fd=%d", fd);
+            if (!raw_worker_id) {
+                log_error(loggerMaster, "fd=%d: ID_WORKER elemento nulo", fd);
+                list_destroy_and_destroy_elements(datos, free);
                 close(fd);
                 return NULL;
             }
-            log_info(loggerMaster, "Worker ID=%s conectado en fd=%d", worker_id, fd);
-
-            worker_registrar(worker_id, fd);
-
-            free(worker_id);
-            if (configMaster->tiempo_aging > 0 && !aging_started) {
-                aging_started=1;
-                pthread_t th_aging;
-                pthread_create(&th_aging, NULL, hilo_aging, NULL);
-                pthread_detach(th_aging);
+        
+            char* worker_id = strdup(raw_worker_id);
+            if (!worker_id) {
+                log_error(loggerMaster, "fd=%d: Error duplicando worker_id", fd);
+                list_destroy_and_destroy_elements(datos, free);
+                close(fd);
+                return NULL;
             }
-
-            // HS
+        
+            list_destroy_and_destroy_elements(datos, free);
+        
+            int res_reg = worker_registrar(worker_id, fd);
+            if (!res_reg) {
+                log_error(loggerMaster, "No se pudo registrar worker %s (fd=%d)", worker_id, fd);
+                free(worker_id);
+                close(fd);
+                return NULL;
+            }
+        
+            if (configMaster->tiempo_aging > 0 && !aging_started) {
+                aging_started = 1;
+                pthread_t th_aging;
+                if (pthread_create(&th_aging, NULL, hilo_aging, NULL) != 0) {
+                    log_error(loggerMaster, "Error creando hilo de aging");
+                } else {
+                    pthread_detach(th_aging);
+                }
+            }
+        
             int ok = 1;
             t_paquete* r = crear_paquete();
             r->codigo_operacion = RTA_ID_WORKER;
             agregar_a_paquete(r, &ok, sizeof(int));
             enviar_paquete(r, fd);
             eliminar_paquete(r);
-
+        
+            log_info(loggerMaster, "Worker %s conectado (fd=%d)", worker_id, fd);
             log_info(loggerMaster, "Workers conectados=%d, disponibles=%d", workers_conectados(), workers_disponibles());
+        
             worker_marcar_libre_por_fd(fd);
             sem_post(&sem_workers_disponibles);
-
-
-            return NULL; // Lanzo un NULL porque el hilo de atender_worker se encarga de cerrar el fd
-
-
+        
+            free(worker_id);
+        
+            return NULL; // el hilo que atiende al worker ya terminó su tarea
         }
         
         case SUBMIT_QUERY: {

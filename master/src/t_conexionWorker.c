@@ -19,22 +19,52 @@ void workers_destruir(void) {
     pthread_mutex_unlock(&mutex_workers);
 }
 
-void worker_registrar(char* id, int fd) {
+int worker_registrar(char* id, int fd) {
+    if (!id) return 0;
+
     t_conexionWorker* w = malloc(sizeof(*w));
-    w->id = id;
+    if (!w) {
+        log_error(loggerMaster, "worker_registrar: malloc fallo");
+        return 0;
+    }
+
+    char* id_copy = strdup(id);
+    if (!id_copy) {
+        log_error(loggerMaster, "worker_registrar: strdup fallo");
+        free(w);
+        return 0;
+    }
+
+    w->id = id_copy;
     w->fd = fd;
     w->conectado = true;
     w->qid_actual = -1;
-    sem_init(&w->semaforo, 0, 0);
+
+    if (sem_init(&w->semaforo, 0, 0) != 0) {
+        log_error(loggerMaster, "worker_registrar: sem_init fallo para worker %s", id_copy);
+        free(w->id);
+        free(w);
+        return 0;
+    }
 
     pthread_mutex_lock(&mutex_workers);
-    if(!LISTA_WORKERS){
-        workers_iniciar();
+    if (!LISTA_WORKERS) {
+        LISTA_WORKERS = list_create();
+        if (!LISTA_WORKERS) {
+            log_error(loggerMaster, "worker_registrar: list_create fallo");
+            pthread_mutex_unlock(&mutex_workers);
+            sem_destroy(&w->semaforo);
+            free(w->id);
+            free(w);
+            return 0;
+        }
     }
     list_add(LISTA_WORKERS, w);
     pthread_mutex_unlock(&mutex_workers);
 
-    if (loggerMaster) log_info(loggerMaster, "Worker %s conectado (fd=%d)", id, fd);
+    log_info(loggerMaster, "Worker %s registrado (fd=%d)", id_copy, fd);
+
+    return 1;
 }
 
 void worker_marcar_libre_por_fd(int fd) {
