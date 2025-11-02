@@ -1,72 +1,72 @@
 #include "query_interpreter.h"
 #include <utilsWorker/configWorker.h>
+#include <commons/log.h> 
 
 t_query_context* query_actual;
 
-void recibir_queries(){
+void recibir_queries() {
     atomic_store(&query_error_flag, 0); // seteo la flag de error
 
-    while(1){
+    while (1) {
         int cod_op = recibir_operacion(conexionMaster);
-        
-        if(cod_op == NUEVA_QUERY){
-                
+        if (cod_op <= 0) {
+            log_error(loggerWorker, "Master desconectado o error en recibir_operacion (op=%d)", cod_op);
+            break;
+        }
+        log_info(loggerWorker, "Recibida operacion %d del Master", cod_op);
+
+        if (cod_op == NUEVA_QUERY) {
             t_list* paquete = recibir_paquete(conexionMaster);
 
-            if(list_size(paquete) < 3) { // Son tres datos necesarios: tamaño, PID y la ruta al archivo
+            if (!paquete || list_size(paquete) < 3) {
                 log_error(loggerWorker, "Error: No se recibieron suficientes datos para la query.");
-                list_destroy(paquete);
-                return;
+                if (paquete) list_destroy_and_destroy_elements(paquete, free);
+                continue;
             }
 
-            // El Master envía: [query_id, nombre_query, pc_inicial]
             int* query_id = list_get(paquete, 0);
-            if(query_id == NULL) {
-                log_error(loggerWorker, "Error: ID de query inválido recibido.");
-                list_destroy(paquete);
-                return;
-            }
             char* nombre_query = list_get(paquete, 1);
-            if(nombre_query == NULL) {
-                log_error(loggerWorker, "Error: Nombre de query inválido recibido.");
-                list_destroy(paquete);
-                return;
-            }
             int* pc_inicial = list_get(paquete, 2);
-            if(pc_inicial == NULL) {
-                log_error(loggerWorker, "Error: PC inicial inválido recibido.");
-                list_destroy(paquete);
-                return;
+
+            if (!query_id || !nombre_query || !pc_inicial) {
+                log_error(loggerWorker, "Error: datos inválidos de query recibidos");
+                list_destroy_and_destroy_elements(paquete, free);
+                continue;
             }
 
-            // Crear contexto global
             query_actual = malloc(sizeof(t_query_context));
             query_actual->query_id = *query_id;
             query_actual->nombre_query = strdup(nombre_query);
-            query_actual->pc_inicial = *pc_inicial; 
+            query_actual->pc_inicial = *pc_inicial;
             PC_ACTUAL = *pc_inicial;
 
-            // Armo el path completo
             char *path_query = string_new();
             string_append(&path_query, configWorker->path_scripts);
             string_append(&path_query, nombre_query);
 
-            log_info(loggerWorker, "## Query %d: Se recibe la Query. El path de operaciones es: %s", query_actual->query_id, path_query);
+            log_info(loggerWorker, "## Query %d: Se recibe la Query. El path de operaciones es: %s",
+                     query_actual->query_id, path_query);
 
-            // ESTO SERIA COMO UN CICLO DE INSTRUCCION
             ejercutar_query(path_query);
-            
+
             list_destroy_and_destroy_elements(paquete, free);
 
             if (atomic_load(&interrupt_flag)) {
-                guardar_paginas_modificadas(); // esto seria como un flush 
+                guardar_paginas_modificadas();
                 notificar_master_desalojo(PC_ACTUAL);
                 atomic_store(&interrupt_flag, 0);
-                break;
             }
+        }
+        else if (cod_op == DESALOJO) {
+            log_debug(loggerWorker, "Master pidió desalojo (detectado en hilo principal)");
+            atomic_store(&interrupt_flag, 1);
+        }
+        else {
+            log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
         }
     }
 }
+
 
 void ejercutar_query(char* path_query){
     FILE* file = fopen(path_query, "r");

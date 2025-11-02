@@ -16,9 +16,14 @@ void iniciarConexionesMaster() {
     planificador_lanzar();
 
     log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
+    log_info(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);
 
     pthread_t hilo;
-    pthread_create(&hilo, NULL, (void*) recibirConexiones, NULL);
+    int result = pthread_create(&hilo, NULL, (void*) recibirConexiones, NULL);
+    if (result != 0) {
+        log_error(loggerMaster, "Error al crear el hilo: %s", strerror(result));
+        return;
+    }
     pthread_join(hilo, NULL);
 }
 
@@ -31,6 +36,7 @@ void* recibirConexiones(void* arg) {
         int cliente_fd = esperarCliente(server_fd_master);
         int* fd_ptr = malloc(sizeof(int));
         *fd_ptr = cliente_fd;
+        log_info(loggerMaster, "Nueva conexión entrante en fd=%d", cliente_fd);
 
         pthread_t hilo;
         pthread_create(&hilo, NULL, (void*) atenderCliente, fd_ptr);
@@ -44,22 +50,36 @@ void* atenderCliente(void* arg) {
     int fd = *((int*) arg);
     free(arg);
 
+    log_info(loggerMaster, "Antes de reibir operacion");
     op_code cod = recibir_operacion(fd);
+    log_info(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
 
     switch (cod) {
         case ID_WORKER: {
             t_list* datos = recibir_paquete(fd);
-            if (list_size(datos) != 1) {
-                log_error(loggerMaster, "fd=%d: ID_WORKER mal formado (items=%d)", fd, list_size(datos));
-                list_destroy_and_destroy_elements(datos, free);
+            if (!datos || list_size(datos) != 1) {
+                int items = datos ? list_size(datos) : 0;
+                log_error(loggerMaster, "fd=%d: ID_WORKER mal formado (items=%d)", fd, items);
+                if (datos) list_destroy_and_destroy_elements(datos, free);
                 close(fd);
                 return NULL;
             }
 
-            int worker_id = *(int*) list_get(datos, 0);
+            char* raw_worker_id = list_get(datos, 0);
+            char* worker_id = strdup(raw_worker_id);
+
             list_destroy_and_destroy_elements(datos, free);
 
+            if (!worker_id) {
+                log_error(loggerMaster, "Error al duplicar worker_id recibido en fd=%d", fd);
+                close(fd);
+                return NULL;
+            }
+            log_info(loggerMaster, "Worker ID=%s conectado en fd=%d", worker_id, fd);
+
             worker_registrar(worker_id, fd);
+
+            free(worker_id);
             if (configMaster->tiempo_aging > 0 && !aging_started) {
                 aging_started=1;
                 pthread_t th_aging;

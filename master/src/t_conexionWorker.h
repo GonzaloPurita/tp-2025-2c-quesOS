@@ -15,7 +15,7 @@ extern t_list* LISTA_WORKERS;
 
 
 typedef struct {
-    int  id;
+    char*  id;
     int  fd;
     bool conectado;   // true si el socket sigue vivo
     int  qid_actual;  // -1 si está libre; si no, el QID que ejecuta
@@ -26,7 +26,7 @@ typedef struct {
 void workers_iniciar(void);
 
 // Altas/bajas
-void worker_registrar(int id, int fd);
+void worker_registrar(char* id, int fd);
 void worker_desconectar_por_fd(int fd);
 
 // Estado de ejecución

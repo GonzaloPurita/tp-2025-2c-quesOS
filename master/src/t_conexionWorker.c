@@ -19,7 +19,7 @@ void workers_destruir(void) {
     pthread_mutex_unlock(&mutex_workers);
 }
 
-void worker_registrar(int id, int fd) {
+void worker_registrar(char* id, int fd) {
     t_conexionWorker* w = malloc(sizeof(*w));
     w->id = id;
     w->fd = fd;
@@ -34,7 +34,7 @@ void worker_registrar(int id, int fd) {
     list_add(LISTA_WORKERS, w);
     pthread_mutex_unlock(&mutex_workers);
 
-    if (loggerMaster) log_info(loggerMaster, "Worker %d conectado (fd=%d)", id, fd);
+    if (loggerMaster) log_info(loggerMaster, "Worker %s conectado (fd=%d)", id, fd);
 }
 
 void worker_marcar_libre_por_fd(int fd) {
@@ -106,7 +106,7 @@ void worker_desconectar_por_fd(int fd) {
 
     if (!w) return;
 
-    log_info(loggerMaster, "Se detectó desconexión del Worker %d (fd=%d)", w->id, fd);
+    log_info(loggerMaster, "Se detectó desconexión del Worker %s (fd=%d)", w->id, fd);
 
     w->conectado = false;
     close(fd);
@@ -123,7 +123,7 @@ void worker_desconectar_por_fd(int fd) {
                 pthread_mutex_unlock(&mutex_cola_exec);
 
                 log_warning(loggerMaster,
-                    "Finalizando Query %d con error por desconexión del Worker %d",
+                    "Finalizando Query %d con error por desconexión del Worker %s",
                     q->QCB->QID, w->id);
 
                 // Notificar al QC solo con qid
@@ -162,11 +162,11 @@ void* atenderWorker(void* arg){
   t_conexionWorker* conexionWorker =  (t_conexionWorker*) arg; 
 
   int fd = conexionWorker ->fd;
-  int id = conexionWorker ->id;
+  char* id = conexionWorker ->id;
   while (1) {
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
-        log_warning(loggerMaster, "Worker %d: desconectado", id);
+        log_warning(loggerMaster, "Worker %s: desconectado", id);
         worker_desconectar_por_fd(fd);
         break;
       }  
@@ -175,7 +175,7 @@ void* atenderWorker(void* arg){
             case RTA_DESALOJO: {
             t_list* p = recibir_paquete(fd);
             if (!p || list_size(p) < 2) {
-                log_error(loggerMaster, "Worker %d: RTA_DESALOJO mal formado", conexionWorker->id);
+                log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
                 if (p) list_destroy_and_destroy_elements(p, free);
                 break;
             }
@@ -211,7 +211,7 @@ void* atenderWorker(void* arg){
             // payload: [qid:int][rc:int]   rc = código de retorno de la query
             t_list* p = recibir_paquete(fd);
             if (list_size(p) < 1) {
-                log_error(loggerMaster, "Worker %d: OP_END mal formado", id);
+                log_error(loggerMaster, "Worker %s: OP_END mal formado", id);
                 list_destroy_and_destroy_elements(p, free);
                 break;
             }
@@ -252,7 +252,7 @@ void* atenderWorker(void* arg){
                 log_warning(loggerMaster, "OP_END: no encontré fd_qc para QID=%d", qid);
             }
 
-            log_info(loggerMaster, "## Query %d finalizada en Worker %d", qid, id);
+            log_info(loggerMaster, "## Query %d finalizada en Worker %s", qid, id);
             break;
         }
 
@@ -260,7 +260,7 @@ void* atenderWorker(void* arg){
             // payload: [qid:int][n:int][bytes:n]
             t_list* p = recibir_paquete(fd);
             if (!p || list_size(p) < 3) {
-                log_error(loggerMaster, "Worker %d: OP_READ mal formado", id);
+                log_error(loggerMaster, "Worker %s: OP_READ mal formado", id);
                 if (p) list_destroy_and_destroy_elements(p, free);
                 break;
             }
@@ -276,7 +276,7 @@ void* atenderWorker(void* arg){
             // 1) Verificar que el QID esté en EXEC y recuperar fd del QC
             int fd_qc = -1;
             if (!exec_buscar_por_qid(qid, &fd_qc)) {
-                log_warning(loggerMaster, "Worker %d: READ para QID=%d no encontrada en EXEC", id, qid);
+                log_warning(loggerMaster, "Worker %s: READ para QID=%d no encontrada en EXEC", id, qid);
                 free(buf);
                 break;
             }
@@ -302,14 +302,14 @@ void* atenderWorker(void* arg){
                 char* valor = list_get(p, 0);
                 log_info(loggerMaster, "## QID=%d: WRITE consumado (%s)", conexionWorker->qid_actual, valor);
             } else {
-                log_error(loggerMaster, "Worker %d: OP_WRITE mal formado", id);
+                log_error(loggerMaster, "Worker %s: OP_WRITE mal formado", id);
             }
             if (p) list_destroy_and_destroy_elements(p, free);
             break;
         }
 
         default:
-            log_warning(loggerMaster, "Worker %d: op_code desconocido %d", id, codigoOperacion);
+            log_warning(loggerMaster, "Worker %s: op_code desconocido %d", id, codigoOperacion);
             // Si el op desconocido tenía payload, tu worker está mandando cualquier cosa.
             break;
         }

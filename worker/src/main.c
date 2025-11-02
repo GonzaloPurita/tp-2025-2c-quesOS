@@ -15,13 +15,13 @@ int main(int argc, char* argv[]) {
 
     // --- Conexión a Master ---
     char* puertoMaster = string_itoa(configWorker->puerto_master);
-    int conexionMaster = crearConexionCliente(configWorker->ip_master, puertoMaster);
+    conexionMaster = crearConexionCliente(configWorker->ip_master, puertoMaster);
     free(puertoMaster);
 
     //enviar ID a Master
     enviar_identificador_a_master(id);
-
-    pthread_create(&hilo_listener, NULL, listener_master, NULL); // hilo que escucha interrupciones del Master
+    
+    //pthread_create(&hilo_listener, NULL, listener_master, NULL); // hilo que escucha interrupciones del Master
 
     recibir_queries();
 
@@ -32,23 +32,23 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void* listener_master() {
-    while (1) {
-        int op = recibir_operacion(conexionMaster);
+// void* listener_master() {
+//     while (1) {
+//         int op = recibir_operacion(conexionMaster);
 
-        if (op <= 0) {
-            log_error(loggerWorker, "Master desconectado o error en recibir_operacion (op=%d). Cerrando listener.", op);
-            close(conexionMaster);
-            break;
-        }
+//         if (op <= 0) {
+//             log_error(loggerWorker, "Master desconectado o error en recibir_operacion (op=%d). Cerrando listener.", op);
+//             close(conexionMaster);
+//             break;
+//         }
 
-        if (op == DESALOJO) {
-            log_debug(loggerWorker, "Master pidió desalojo");
-            atomic_store(&interrupt_flag, 1);
-        } else {
-            log_debug(loggerWorker, "Listener Master recibió op desconocida: %d", op);
-        }
-    }
+//         if (op == DESALOJO) {
+//             log_debug(loggerWorker, "Master pidió desalojo");
+//             atomic_store(&interrupt_flag, 1);
+//         } else {
+//             log_debug(loggerWorker, "Listener Master recibió op desconocida: %d", op);
+//         }
+//     }
 
-    return NULL;
-}
+//     return NULL;
+// }

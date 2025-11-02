@@ -3,8 +3,8 @@
 #include "configWorker.h"
 
 // Conexiones globales
-int conexionMaster;
-int conexionStorage;
+int conexionMaster = 0;
+int conexionStorage = 0;
 
 t_log* loggerWorker;
 t_config_worker* configWorker;

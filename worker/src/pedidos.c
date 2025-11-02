@@ -62,6 +62,7 @@ void pedir_tamanio_de_bloque(){
 int enviar_identificador_a_master(char* id) {
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = ID_WORKER;
+    log_info(loggerWorker, "la conexion con master es: %d y el id es: %s", conexionMaster, id);
 
     agregar_a_paquete(paquete, id, strlen(id)+1);
     enviar_paquete(paquete, conexionMaster);
