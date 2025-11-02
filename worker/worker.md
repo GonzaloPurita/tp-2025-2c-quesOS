@@ -47,6 +47,22 @@ Es el encargado de **leer y ejecutar** las instrucciones de la Query.
   - **Storage** (cuando falta una página o hay operaciones de persistencia).
   - **Master** (para enviar resultados de lecturas o avisar fin).
 
+    #### Como lo pense: 
+            - se podria trabajar con una lista indexada de las queries y el PC es la posición de la query.
+    #### ejemplo
+    ```c
+        0 → CREATE MATERIAS:BASE
+        1 → TRUNCATE MATERIAS:BASE 1024
+        2 → WRITE MATERIAS:BASE 0 SISTEMAS_OPERATIVOS
+        3 → FLUSH MATERIAS:BASE
+        4 → END
+    ```
+        Si Master te da PC = 0 → arrancás desde CREATE.
+
+        Si Master te da PC = 2 → arrancás desde WRITE.
+
+        Si Master te da PC = 5 → significa que la Query ya terminó (no hay más instrucciones).
+
 ## Instrucciones
 
 ### CREATE

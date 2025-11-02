@@ -2,53 +2,29 @@
 
 int main(int argc, char* argv[]) { 
     iniciar_config(argv[1]);
-    char* id = argv[2];
 
-    // --- Conexión a Storage ---
-    char* puertoStorage = string_itoa(configWorker->puerto_storage);
-    conexionStorage = crearConexionCliente(configWorker->ip_storage, puertoStorage);
-    free(puertoStorage);
-    log_info(loggerWorker, "la conexion con storage es: %d", conexionStorage);
-    pedir_tamanio_de_bloque(); // llega el TAM_BLOQUE (global)
-
-    iniciar_memoria(); // inicializa memoria interna usando el TAM_BLOQUE
-
-    // --- Conexión a Master ---
     char* puertoMaster = string_itoa(configWorker->puerto_master);
-    conexionMaster = crearConexionCliente(configWorker->ip_master, puertoMaster);
+    int conexionMaster = crearConexionCliente(configWorker->ip_master, puertoMaster);
     free(puertoMaster);
 
-    //enviar ID a Master
-    enviar_identificador_a_master(id);
-    
-    //pthread_create(&hilo_listener, NULL, listener_master, NULL); // hilo que escucha interrupciones del Master
-
-    recibir_queries();
-
-    pthread_join(hilo_listener, NULL);
-    liberar_config();
-    close(conexionStorage);
+    t_paquete* paqueteMaster = crear_paquete();
+    paqueteMaster->codigo_operacion = MENSAJE;
+    agregar_a_paquete(paqueteMaster, "Hola soy el Worker", strlen("Hola soy el Worker") + 1);
+    enviar_paquete(paqueteMaster, conexionMaster);
+    eliminar_paquete(paqueteMaster);
     close(conexionMaster);
+
+    char* puertoStorage = string_itoa(configWorker->puerto_storage);
+    int conexionStorage = crearConexionCliente(configWorker->ip_storage, puertoStorage);
+    free(puertoStorage);
+
+    t_paquete* paqueteStorage = crear_paquete();
+    paqueteStorage->codigo_operacion = MENSAJE;
+    agregar_a_paquete(paqueteStorage, "Hola soy el Worker", strlen("Hola soy el Worker") + 1);
+    enviar_paquete(paqueteStorage, conexionStorage);
+    eliminar_paquete(paqueteStorage);
+    close(conexionStorage);
+
+    liberar_config();
     return 0;
 }
-
-// void* listener_master() {
-//     while (1) {
-//         int op = recibir_operacion(conexionMaster);
-
-//         if (op <= 0) {
-//             log_error(loggerWorker, "Master desconectado o error en recibir_operacion (op=%d). Cerrando listener.", op);
-//             close(conexionMaster);
-//             break;
-//         }
-
-//         if (op == DESALOJO) {
-//             log_debug(loggerWorker, "Master pidió desalojo");
-//             atomic_store(&interrupt_flag, 1);
-//         } else {
-//             log_debug(loggerWorker, "Listener Master recibió op desconocida: %d", op);
-//         }
-//     }
-
-//     return NULL;
-// }

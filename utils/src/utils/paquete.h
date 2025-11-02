@@ -5,10 +5,11 @@
 #include<stdlib.h>
 #include<string.h>
 #include<commons/collections/list.h>
-#include "conexiones.h"
+#include"conexiones.h"
 
 typedef enum {
 	MENSAJE,
+
 	// WORKER <---> STORAGE
 	// OPERACIONES
 	TAMANIO_BLOQUE,
