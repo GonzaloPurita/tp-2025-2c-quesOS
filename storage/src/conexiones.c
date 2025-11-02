@@ -39,73 +39,45 @@ void recibirCliente(void* cliente) {
     while(1) {
         log_info(loggerStorage, "Esperando peticiones del Worker...");
         op_code cod = recibir_operacion(socket_cliente);
-        log_info(loggerStorage, "Operacion recibida: %d", cod);
+        sleep(configStorage->retardo_operacion * 1000); // Simulo retardo de operacion
+        log_debug(loggerStorage, "Operacion recibida: %d", cod);
+        datosRecibidos = recibir_paquete(socket_cliente);
         switch(cod) {
             case TAMANIO_BLOQUE: {
-                log_info(loggerStorage, "Handshake correcto, respondiendo con blocksize=%d", superblock->blocksize);
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                log_info(loggerStorage, "tamanio de bloque: %d", superblock->blocksize);
                 datosEnviados = crearNuevoPaquete(TAMANIO_BLOQUE);
                 agregar_a_paquete(datosEnviados, &(superblock->blocksize), sizeof(int));
                 enviar_paquete(datosEnviados, socket_cliente);
                 break;
             }
             case OP_CREATE: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_CREATE
+                crearFile(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_TRUNCATE: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_TRUNCATE_ADD
-                break;
-            }
-            case OP_DELETE: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_DELETE
+                truncar(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_TAG: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_TAG
+                tag(datosRecibidos, socket_cliente);
+
+                break;
+            }
+            case OP_DELETE: {
+                eliminarTag(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_COMMIT: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_COMMIT
+                commit(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_WRITE: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                agregar_a_paquete(datosEnviados, "Lei algo", 9);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_WRITE
+                sleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
+                writeFileTag(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_READ: {
-                datosRecibidos = recibir_paquete(socket_cliente);
-                list_destroy_and_destroy_elements(datosRecibidos, free);
-                datosEnviados = crearNuevoPaquete(OP_SUCCESS);
-                enviar_paquete(datosEnviados, socket_cliente);
-                // TODO: Implementar comportamiento para OP_READ
+                sleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
+                readBloqueLogico(datosRecibidos, socket_cliente);
                 break;
             }
             default:
@@ -115,6 +87,9 @@ void recibirCliente(void* cliente) {
 
         if (datosEnviados != NULL) {
             eliminar_paquete(datosEnviados);
+        }
+        if (datosRecibidos != NULL) {
+            list_destroy_and_destroy_elements(datosRecibidos, free);
         }
     }
 }
