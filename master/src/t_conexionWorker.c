@@ -60,9 +60,10 @@ int worker_registrar(char* id, int fd) {
         }
     }
     list_add(LISTA_WORKERS, w);
+    int list_size_now = list_size(LISTA_WORKERS);
     pthread_mutex_unlock(&mutex_workers);
 
-    log_info(loggerMaster, "Worker %s registrado (fd=%d)", id_copy, fd);
+    if (loggerMaster) log_info(loggerMaster, "Worker %s registrado (fd=%d). Lista size=%d", id_copy, fd, list_size_now);
 
     return 1;
 }

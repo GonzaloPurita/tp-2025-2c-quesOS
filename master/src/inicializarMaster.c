@@ -13,18 +13,19 @@ void iniciarConexionesMaster() {
     free(puerto);
     inicializarSemaforos();
     workers_iniciar();
-    planificador_lanzar();
+    //planificador_lanzar();
 
     log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
     log_info(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);
 
-    pthread_t hilo;
-    int result = pthread_create(&hilo, NULL, (void*) recibirConexiones, NULL);
+    pthread_t hilo_conexiones;
+    int result = pthread_create(&hilo_conexiones, NULL, recibirConexiones, NULL);
     if (result != 0) {
-        log_error(loggerMaster, "Error al crear el hilo: %s", strerror(result));
+        log_error(loggerMaster, "Error al crear hilo de conexiones: %s", strerror(result));
         return;
     }
-    pthread_join(hilo, NULL);
+
+    pthread_join(hilo_conexiones, NULL);
 }
 
 void cerrarConexionesMaster() {
@@ -33,6 +34,7 @@ void cerrarConexionesMaster() {
 
 void* recibirConexiones(void* arg) {
     while (1) {
+        log_info(loggerMaster, "Esperando nuevas conexiones...");
         int cliente_fd = esperarCliente(server_fd_master);
         int* fd_ptr = malloc(sizeof(int));
         *fd_ptr = cliente_fd;
@@ -82,15 +84,16 @@ void* atenderCliente(void* arg) {
         
             list_destroy_and_destroy_elements(datos, free);
         
-            int res_reg = worker_registrar(worker_id, fd);
-            if (!res_reg) {
-                log_error(loggerMaster, "No se pudo registrar worker %s (fd=%d)", worker_id, fd);
+            log_info(loggerMaster, "Worker ID=%s conectado en fd=%d", worker_id, fd);
+        
+            if (!worker_registrar(worker_id, fd)) {
+                log_error(loggerMaster, "No se pudo registrar worker %s en fd=%d", worker_id, fd);
                 free(worker_id);
                 close(fd);
                 return NULL;
             }
         
-            if (configMaster->tiempo_aging > 0 && !aging_started) {
+            if (configMaster->tiempo_aging > 0 && !aging_started && configMaster->algoritmo_planificacion && strcmp(configMaster->algoritmo_planificacion, "PRIORIDADES") == 0) {
                 aging_started = 1;
                 pthread_t th_aging;
                 if (pthread_create(&th_aging, NULL, hilo_aging, NULL) != 0) {
@@ -117,6 +120,7 @@ void* atenderCliente(void* arg) {
         
             return NULL; // el hilo que atiende al worker ya terminó su tarea
         }
+        
         
         case SUBMIT_QUERY: {
             // Recibo la query: [ int prioridad ][ int len ][ char[len] path ]
