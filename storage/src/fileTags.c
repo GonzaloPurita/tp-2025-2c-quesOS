@@ -345,24 +345,29 @@ bool cambiarEstadoMetaData(char* file, char* tag, t_estado_fileTag estadoNuevo) 
 }
 
 op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag) {
-    // Creamos la ruta tag
-    string_append(&rutaBase, "/");
-    string_append(&rutaBase, nombreTag);
-    if (crearDirectorio(rutaBase) == -1) { // Me genera la carpeta con el nombre del tag.
+    // Trabajar sobre una copia para no invalidar el puntero original del caller
+    char* rutaTag = string_duplicate(rutaBase);
+    string_append(&rutaTag, "/");
+    string_append(&rutaTag, nombreTag);
+    if (crearDirectorio(rutaTag) == -1) { // Me genera la carpeta con el nombre del tag.
+        free(rutaTag);
         return OP_FAILED;
     }
 
     // Creo el metadata.config para el tag
-    if (!crearMetaData(rutaBase)) {
+    if (!crearMetaData(rutaTag)) {
+        free(rutaTag);
         return OP_FAILED;
     }
 
     // Creamos la ruta logical_blocks
-    string_append(&rutaBase, "/logical_blocks");
-    if (crearDirectorio(rutaBase) == -1) { // Me genera la carpeta logical_blocks.
+    string_append(&rutaTag, "/logical_blocks");
+    if (crearDirectorio(rutaTag) == -1) { // Me genera la carpeta logical_blocks.
+        free(rutaTag);
         return OP_FAILED;
     }
 
+    free(rutaTag);
     return OP_SUCCESS;
 }
 
