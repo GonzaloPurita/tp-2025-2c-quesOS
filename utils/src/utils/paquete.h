@@ -9,11 +9,12 @@
 
 typedef enum {
 	MENSAJE,
-
+  
 	// Master <---> QUERY CONTROL
 	SUBMIT_QUERY,
 	RTA_SUBMIT_QUERY,
 	MENSAJE_LECTURA,
+
 	QUERY_FINALIZADA,
 
 	// WORKER <---> MASTER
