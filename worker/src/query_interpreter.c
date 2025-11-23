@@ -15,7 +15,7 @@ void recibir_queries() {
         }
         log_info(loggerWorker, "Recibida operacion %d del Master", cod_op);
 
-        if (cod_op == NUEVA_QUERY) {
+        if (cod_op == QCB) {
             t_list* paquete = recibir_paquete(conexionMaster);
 
             if (!paquete || list_size(paquete) < 3) {
@@ -25,8 +25,8 @@ void recibir_queries() {
             }
 
             int* query_id = list_get(paquete, 0);
-            char* nombre_query = list_get(paquete, 1);
-            int* pc_inicial = list_get(paquete, 2);
+            int* pc_inicial = list_get(paquete, 1);
+            char* nombre_query = list_get(paquete, 2);
 
             if (!query_id || !nombre_query || !pc_inicial) {
                 log_error(loggerWorker, "Error: datos inválidos de query recibidos");
@@ -36,8 +36,8 @@ void recibir_queries() {
 
             query_actual = malloc(sizeof(t_query_context));
             query_actual->query_id = *query_id;
-            query_actual->nombre_query = strdup(nombre_query);
             query_actual->pc_inicial = *pc_inicial;
+            query_actual->nombre_query = strdup(nombre_query);
             PC_ACTUAL = *pc_inicial;
 
             char *path_query = string_new();
@@ -234,6 +234,7 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
 void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TAMAÑO> ej TRUNCATE MATERIAS:BASE 1024
     char* recurso = inst->parametros[0];
     char* tamanio = inst->parametros[1]; // "1024"
+    log_debug(loggerWorker, "Ejecutando TRUNCATE %s %s", recurso, tamanio);
     
     // Mapear <NOMBRE_FILE>:<TAG> → t_formato
     t_formato* formato = mapear_formato(recurso);
@@ -247,6 +248,7 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     eliminar_paquete(paquete);
 
     op_code rta = recibir_operacion(conexionStorage);
+    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE: %d", rta);
     manejar_respuesta_storage(rta, "TRUNCATE");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
@@ -344,9 +346,8 @@ void ejecutar_end(t_instruccion* inst){
     enviar_paquete(paquete, conexionMaster);
     eliminar_paquete(paquete);
 
-    op_code rta = recibir_operacion(conexionStorage);
-    manejar_respuesta_storage(rta, "END");
-
+    // op_code rta = recibir_operacion(conexionStorage);
+    // manejar_respuesta_storage(rta, "END");
 
     // libero contexto
     destruir_query_context(query_actual);

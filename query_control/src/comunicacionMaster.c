@@ -27,6 +27,13 @@ void escucharMaster(int conexionMaster){
 
                 log_info(loggerQueryControl,"## Lectura realizada: Archivo %s, contenido: %s", file_tag, contenido);
                 break;
+            case RTA_SUBMIT_QUERY:
+            // recibe: <Mensaje de confirmación>
+                if (list_size(valores) < 1) {
+                    log_error(loggerQueryControl, "Paquete RTA_SUBMIT_QUERY incompleto");
+                    list_destroy_and_destroy_elements(valores, free);
+                }
+                break;
             case QUERY_FINALIZADA:
             // recibe: <Motivo>
                 if (list_size(valores) < 1) {

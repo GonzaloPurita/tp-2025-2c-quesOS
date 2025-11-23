@@ -26,6 +26,7 @@ t_query* crearQuery(const char* path, int prioridad);
 void destruirQuery(t_query* q);
 void agregarAReadyPorPrioridad(t_query* q);
 void actualizarMetricas(estado_query estadoActual, estado_query estadoNuevo, t_query* q);
+void inicializarListasQueries();
 
 extern t_list* cola_ready;
 extern t_list*  cola_exec;

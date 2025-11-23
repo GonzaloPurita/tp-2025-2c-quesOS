@@ -20,7 +20,7 @@ typedef struct {
 t_qcb* crearQCB(void);
 
 /* Serialización (opcional: usala solo si tu protocolo manda el QCB “como paquete”) */
-void enviarQCB(int conexion, t_qcb* qcb);     // op_code: QCB (o el que definas)
+void enviarQCB(int conexion, t_qcb* qcb, char* nombreArchivo);     // op_code: QCB (o el que definas)
 t_qcb* recibirQCB(int conexion);
 
 /* Destroy */

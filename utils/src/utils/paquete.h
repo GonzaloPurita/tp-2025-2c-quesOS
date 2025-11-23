@@ -20,7 +20,6 @@ typedef enum {
 	// WORKER <---> MASTER
 	ID_WORKER,
 	RTA_ID_WORKER,
-	NUEVA_QUERY,
 	OP_END,
 	OP_READ,
 	DESALOJO,

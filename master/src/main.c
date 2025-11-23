@@ -2,6 +2,7 @@
 
 int main(int argc, char* argv[]) {
     iniciar_config();              // crea loggerMaster también
+    inicializarListasQueries();
     iniciarConexionesMaster();     // levanta el server y el aceptador
     return 0;
 }

@@ -13,7 +13,7 @@ void iniciarConexionesMaster() {
     free(puerto);
     inicializarSemaforos();
     workers_iniciar();
-    //planificador_lanzar();
+    planificador_lanzar();
 
     log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
     log_info(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);

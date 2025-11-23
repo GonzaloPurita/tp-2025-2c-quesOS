@@ -39,9 +39,9 @@ void recibirCliente(void* cliente) {
     while(1) {
         log_info(loggerStorage, "Esperando peticiones del Worker...");
         op_code cod = recibir_operacion(socket_cliente);
-        log_info(loggerStorage, "Operacion recibida: %d", cod);
         switch(cod) {
             case TAMANIO_BLOQUE: {
+                log_debug(loggerStorage, "Recibida operacion TAMANIO_BLOQUE del Worker");
                 log_info(loggerStorage, "Handshake correcto, respondiendo con blocksize=%d", superblock->blocksize);
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
@@ -52,6 +52,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_CREATE: {
+                log_debug(loggerStorage, "Recibida operacion OP_CREATE del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -60,6 +61,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_TRUNCATE: {
+                log_debug(loggerStorage, "Recibida operacion OP_TRUNCATE del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -68,6 +70,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_DELETE: {
+                log_debug(loggerStorage, "Recibida operacion OP_DELETE del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -76,6 +79,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_TAG: {
+                log_debug(loggerStorage, "Recibida operacion OP_TAG del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -84,6 +88,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_COMMIT: {
+                log_debug(loggerStorage, "Recibida operacion OP_COMMIT del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -92,6 +97,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_WRITE: {
+                log_debug(loggerStorage, "Recibida operacion OP_WRITE del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -101,6 +107,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_READ: {
+                log_debug(loggerStorage, "Recibida operacion OP_READ del Worker");
                 datosRecibidos = recibir_paquete(socket_cliente);
                 list_destroy_and_destroy_elements(datosRecibidos, free);
                 datosEnviados = crearNuevoPaquete(OP_SUCCESS);
@@ -109,7 +116,7 @@ void recibirCliente(void* cliente) {
                 break;
             }
             default:
-                log_error(loggerStorage, "Operacion desconocida. No se puede atender al cliente.");
+                log_error(loggerStorage, "Operacion desconocida: %d.", cod);
                 return;
         }
 

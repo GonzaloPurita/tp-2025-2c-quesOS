@@ -100,7 +100,7 @@ void planificarSinDesalojo() {
 void enviarQueryAWorker(t_query* query) {
     t_conexionWorker* conexionWorker = obtenerWorkerLibre(); // Obtengo un worker libre
     conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
-    enviarQCB(conexionWorker ->fd, query ->QCB); // 
+    enviarQCB(conexionWorker->fd, query->QCB, query->path); // 
     pthread_t hiloWORKER;
     pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) conexionWorker); 
     pthread_detach(hiloWORKER);
@@ -108,7 +108,7 @@ void enviarQueryAWorker(t_query* query) {
 
 void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWorker) {
     conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
-    enviarQCB(conexionWorker ->fd, query ->QCB); // 
+    enviarQCB(conexionWorker->fd, query->QCB, query->path); // 
     pthread_t hiloWORKER;
     pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) conexionWorker); 
     pthread_detach(hiloWORKER);

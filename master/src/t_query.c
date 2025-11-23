@@ -6,6 +6,12 @@ t_list* cola_ready = NULL;
 t_list* cola_exec  = NULL;
 t_list* cola_exit  = NULL;
 
+void inicializarListasQueries() {
+    cola_ready = list_create();
+    cola_exec  = list_create();
+    cola_exit  = list_create();
+}
+
 t_query* crearQuery(const char* path, int prioridad) {
     pthread_mutex_lock(&mutex_queries);
 

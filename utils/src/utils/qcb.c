@@ -15,11 +15,12 @@ t_qcb* crearQCB(void) {
     return nuevo;
 }
 
-void enviarQCB(int conexion, t_qcb* qcb) {
+void enviarQCB(int conexion, t_qcb* qcb, char* nombreArchivo) {
     t_paquete* p = crear_paquete();
     p->codigo_operacion = QCB;  
     agregar_a_paquete(p, &qcb->QID, sizeof(int));
     agregar_a_paquete(p, &qcb->PC,  sizeof(int));
+    agregar_a_paquete(p, nombreArchivo, strlen(nombreArchivo) + 1);
     enviar_paquete(p, conexion);
     eliminar_paquete(p);
 }
