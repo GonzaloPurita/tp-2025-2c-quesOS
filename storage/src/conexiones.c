@@ -49,10 +49,12 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_CREATE: {
+                log_debug(loggerStorage, "Ejecutando CREATE desde conexion");
                 crearFile(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_TRUNCATE: {
+                log_debug(loggerStorage, "Ejecutando TRUNCATE desde conexion");
                 truncar(datosRecibidos, socket_cliente);
                 break;
             }
