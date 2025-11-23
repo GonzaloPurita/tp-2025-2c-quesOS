@@ -30,6 +30,8 @@ typedef enum {
 extern t_config_storage* configStorage;
 extern t_superblock* superblock;
 extern t_log* loggerStorage;
+// TODO: Implementar semáforos para el hashMap
+extern t_config* hashMap; // Mapa de hashes de bloques físicos
 
 /**
  * @brief Inicializa la configuración del módulo de almacenamiento.
@@ -39,7 +41,7 @@ extern t_log* loggerStorage;
  * llamada antes de utilizar cualquier funcionalidad que dependa de estas
  * configuraciones.
  */
-void inicializarConfigs();
+void inicializarConfigs(char* archivoConfiguracion);
 
 /**
  * @brief Libera los recursos asignados para la configuración.
@@ -59,4 +61,14 @@ void liberarConfigs();
  */
 char* estadoToString(t_estado_fileTag estado);
 
-#endif 
+/**
+ * @brief Inicializa el índice de hashes (blocks_hash_index.config) y asigna hashMap.
+ * 
+ * Esta función se encarga de crear o abrir el archivo de índice de hashes
+ * y asignar el puntero global hashMap para su uso.
+ */
+void incializarHashMap();
+
+void inicializarConfigStorage(char* archivoConfiguracion);
+
+#endif
