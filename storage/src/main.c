@@ -3,9 +3,9 @@
 void* recibirCliente(void* cliente);
 
 int main(int argc, char* argv[]) { 
-      if (argc < 2) {
-        fprintf(stderr, "Uso: %s <archivo_configuracion>\n", argv[0]);
-        return 1;
+    if (argc < 2) {
+      fprintf(stderr, "Uso: %s <archivo_configuracion>\n", argv[0]);
+      return 1;
     }
 
     char* archivoConfiguracion = argv[1]; 
