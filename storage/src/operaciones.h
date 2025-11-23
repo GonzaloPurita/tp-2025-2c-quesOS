@@ -1,0 +1,4 @@
+#ifndef _OPERACIONES_H
+#define _OPERACIONES_H
+
+#endif // _OPERACIONES_H
