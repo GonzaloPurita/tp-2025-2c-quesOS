@@ -22,7 +22,8 @@ void crearFile(t_list* data, int socket_cliente) {
 void truncar(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
-    int nuevoTamanio = *((int*) list_get(data, 2));
+    int bytes = *((int*) list_get(data, 2));
+    int nuevoTamanio = pasarABloques(bytes);
     log_debug(loggerStorage, "Truncar file tag %s:%s a tamaño %d", nombreFile, nombreTag, nuevoTamanio);
 
     t_config* metadata = getMetaData(nombreFile, nombreTag);
@@ -121,6 +122,7 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
     t_paquete* paqueteRespuesta = crear_paquete();
     paqueteRespuesta->codigo_operacion = OP_SUCCESS;
     agregar_a_paquete(paqueteRespuesta, datos, superblock->blocksize);
+    log_debug(loggerStorage, "Enviando paquete EXITOSO - READ");
     enviar_paquete(paqueteRespuesta, socket_cliente);
     eliminar_paquete(paqueteRespuesta);
     free(datos);
@@ -129,6 +131,7 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
 // Privados - Implementaciones
 void enviarRespuesta(op_code codigo, int socket_cliente) {
     t_paquete* paqueteRespuesta = crear_paquete();
+    log_debug(loggerStorage, "Enviando un paquete con codigo %d", codigo);
     paqueteRespuesta->codigo_operacion = codigo;
     enviar_paquete(paqueteRespuesta, socket_cliente);
     eliminar_paquete(paqueteRespuesta);

@@ -45,8 +45,8 @@ void recibirCliente(void* cliente) {
             case TAMANIO_BLOQUE: {
                 datosEnviados = crearNuevoPaquete(TAMANIO_BLOQUE);
                 agregar_a_paquete(datosEnviados, &(superblock->blocksize), sizeof(int));
+                log_debug(loggerStorage, "Enviando paquete con Tamanio de bloque");
                 enviar_paquete(datosEnviados, socket_cliente);
-
                 break;
             }
             case OP_CREATE: {

@@ -265,9 +265,10 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
-    op_code rta = recibir_operacion(conexionStorage);
-    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE: %d", rta);
-    manejar_respuesta_storage(rta, "TRUNCATE");
+    op_code rta1 = recibir_operacion(conexionStorage);
+    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE 1: %d", rta1);
+
+    manejar_respuesta_storage(rta1, "TRUNCATE");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
 

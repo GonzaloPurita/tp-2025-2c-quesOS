@@ -56,4 +56,12 @@ bool directorioExiste(const char* path);
  */
 bool archivoExiste(const char* path);
 
+/**
+ *@brief Convierte una cantidad de bytes en cantidad de bloques, redondeando para arriba
+ *
+ *@param bytes Cantidad de bytes a convertir
+ *@return Cantidad de bloques
+ */
+int pasarABloques(int bytes);
+
 #endif

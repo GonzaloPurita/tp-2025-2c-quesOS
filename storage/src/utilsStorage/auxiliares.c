@@ -70,3 +70,11 @@ char* rutaCompleta(char* nombre) {
     string_append(&ruta, nombre);
     return ruta;
 }
+
+int pasarABloques(int bytes) {
+    if(bytes % superblock->blocksize == 0) {
+        return bytes/superblock->blocksize;
+    } else {
+        return bytes/superblock->blocksize + 1;
+    }
+}
