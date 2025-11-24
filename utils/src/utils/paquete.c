@@ -85,13 +85,30 @@ t_list* recibir_paquete(int socket_cliente) {
 }
 
 void* recibir_buffer(int* size, int socket_cliente) {
-	void * buffer;
+    void * buffer;
 
-	recv(socket_cliente, size, sizeof(int), MSG_WAITALL);
-	buffer = malloc(*size);
-	recv(socket_cliente, buffer, *size, MSG_WAITALL);
+    // 1. Recibimos el tamaño
+    if (recv(socket_cliente, size, sizeof(int), MSG_WAITALL) <= 0) {
+        // Manejo de error si el socket se cerró o falló
+        *size = 0; 
+        return NULL; 
+    }
 
-	return buffer;
+    // 2. CASO ESPECIAL: Si el tamaño es 0 (Paquete vacío)
+    if (*size == 0) {
+        return NULL; // Devolvemos NULL, free(NULL) es seguro en C
+    }
+
+    // 3. Flujo normal
+    buffer = malloc(*size);
+    if (buffer == NULL) {
+        // Manejo de error de memoria
+        return NULL;
+    }
+    
+    recv(socket_cliente, buffer, *size, MSG_WAITALL);
+
+    return buffer;
 }
 
 void crear_buffer(t_paquete* paquete) {

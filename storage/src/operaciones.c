@@ -58,7 +58,7 @@ void truncar(t_list* data, int socket_cliente) {
     config_destroy(metadata);
 }
 
-void tag(t_list* data, int socket_cliente) {
+void tag(t_list* data, int socket_cliente) { // TODO: MAL HECHO, VOLVER A HACER :-(
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     op_code resultado = crearTag(nombreFile, nombreTag);

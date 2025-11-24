@@ -241,10 +241,11 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     eliminar_paquete(paquete);
 
     op_code rta = recibir_operacion(conexionStorage);
+    t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "CREATE");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
-    
+    list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
 }
 
@@ -266,12 +267,14 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     eliminar_paquete(paquete);
 
     op_code rta1 = recibir_operacion(conexionStorage);
+    t_list* rtaP = recibir_paquete(conexionStorage);
     log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE 1: %d", rta1);
 
     manejar_respuesta_storage(rta1, "TRUNCATE");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
 
+    list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
 }
 
@@ -293,10 +296,12 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
     eliminar_paquete(paquete);
 
     op_code rta = recibir_operacion(conexionStorage);
+    t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "TAG");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
 
+    list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato_origen);
     destruir_formato(formato_destino);
 }
@@ -420,6 +425,8 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
     // calculo las paginas necesarias
     t_list* paginas = paginas_necesarias(direccion_base, tamanio_valor);
+
+    log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
 
     // para cada página, verifica si está en memoria; si no, pedirla
     for (int i = 0; i < list_size(paginas); i++) { 
