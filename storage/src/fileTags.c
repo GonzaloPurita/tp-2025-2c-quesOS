@@ -445,3 +445,54 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
 
     return true;
 }
+
+op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, char* tagDestino) {
+    // Validar que el tag origen exista
+    t_config* metaDataOriginal = getMetaData(fileOrigen, tagOrigen);
+    if(metaDataOriginal == NULL) {
+        log_error(loggerStorage,"El tag origen %s:%s no existe", fileOrigen, tagOrigen);
+        return ERROR_FILE_NOT_FOUND;
+    }
+
+    // Validar que el tag origen esté en estado COMMITED
+    char* estado = config_get_string_value(metaDataOriginal, "ESTADO");
+    if (strcmp(estado, "COMMITED") != 0) {
+        log_error(loggerStorage, "El tag origen %s:%s no está en estado COMMITED (estado actual: %s)", fileOrigen, tagOrigen, estado);
+        config_destroy(metaDataOriginal);
+        return ERROR_WRITE_NOT_ALLOWED;
+    }
+
+    // Copiar los bloques del tag origen al tag destino
+    char** blocks = config_get_array_value(metaDataOriginal, "BLOCKS");
+    int bloquesCount = 0;
+    while(blocks[bloquesCount] != NULL) {
+        bool resultado = agregarBloqueLogicoHL(fileDestino, tagDestino, bloquesCount, atoi(blocks[bloquesCount]));
+        if (!resultado) {
+            log_error(loggerStorage, "Error al agregar bloque lógico %d al tag destino %s:%s", bloquesCount, fileDestino, tagDestino);
+            string_array_destroy(blocks);
+            config_destroy(metaDataOriginal);
+            return OP_FAILED;
+        }
+        bloquesCount++;
+    }
+
+    // Actualizar metadata del tag destino
+    t_config* metaDataDestino = getMetaData(fileDestino, tagDestino);
+    if (metaDataDestino == NULL) {
+        log_error(loggerStorage, "Error al obtener metadata del tag destino %s:%s", fileDestino, tagDestino);
+        string_array_destroy(blocks);
+        config_destroy(metaDataOriginal);
+        return OP_FAILED;
+    }
+
+    config_set_value(metaDataDestino, "TAMAÑO", config_get_string_value(metaDataOriginal, "TAMAÑO"));
+    config_set_value(metaDataDestino, "ESTADO", "WORK_IN_PROGRESS");
+    config_save(metaDataDestino);
+
+    string_array_destroy(blocks);
+    config_destroy(metaDataOriginal);
+    config_destroy(metaDataDestino);
+    
+    log_info(loggerStorage, "Tag %s:%s duplicado exitosamente a %s:%s", fileOrigen, tagOrigen, fileDestino, tagDestino);
+    return OP_SUCCESS;
+}

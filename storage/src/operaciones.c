@@ -10,6 +10,7 @@ op_code borrarTag(char* nombreFile, char* nombreTag);
 op_code commitTag(char* nombreFile, char* nombreTag);
 op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido);
 void logearResultadoOP(op_code resultado, char* operacion);
+op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t);
 
 void crearFile(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
@@ -58,10 +59,16 @@ void truncar(t_list* data, int socket_cliente) {
     config_destroy(metadata);
 }
 
-void tag(t_list* data, int socket_cliente) { // TODO: MAL HECHO, VOLVER A HACER :-(
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
-    op_code resultado = crearTag(nombreFile, nombreTag);
+void tag(t_list* data, int socket_cliente) {
+    if(list_size(data) != 4) {
+        log_error(loggerStorage, "Me llegaron mas/menos datos de los que esperaba (4).");
+        return;
+    }
+    char* nombreFileOriginal = list_get(data, 0);
+    char* nombreTagOriginal = list_get(data, 1);
+    char* nombreFile = list_get(data, 2);
+    char* nombreTag = list_get(data, 3);
+    op_code resultado = opTag(nombreFileOriginal, nombreTagOriginal, nombreFile, nombreTag);
     enviarRespuesta(resultado, socket_cliente);
 
     logearResultadoOP(resultado, "Crear TAG");
@@ -231,11 +238,12 @@ void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio
     }
 
     string_append(&bloquesActualizados, "]");
-
-    // Actualizar la metadata (clave BLOCKS)
+    char* tamanio = string_itoa(nuevoTamanio);
+    config_set_value(metadata, "TAMAÑO", tamanio);
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     config_save(metadata);
     free(bloquesActualizados);
+    free(tamanio);
 }
 
 op_code borrarTag(char* nombreFile, char* nombreTag) {
@@ -332,7 +340,7 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
     free(nombreBloqueLogico);
 
     int bloqueFisico;
-    if(esHardlinkUnico(pathBloqueLogico)) {
+    if(esHardlinkUnico(pathBloqueLogico)) { // Como es HL unico, puedo escribir directamente en el bloque fisico
         bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
     } else {
         // El bloque tiene mas de un Hardlink -> Le asigno uno nuevo
@@ -370,4 +378,28 @@ void logearResultadoOP(op_code resultado, char* operacion) {
     } else {
         log_warning(loggerStorage, "Operacion: %s finalizada con error: %d", operacion, resultado);
     }
+}
+
+op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t) {
+    // Validar que el tag destino no exista
+    t_config* metaDataDestino = getMetaData(f, t);
+    if (metaDataDestino != NULL) {
+        log_error(loggerStorage, "El tag destino %s:%s ya existe", f, t);
+        config_destroy(metaDataDestino);
+        return OP_FAILED;
+    }
+
+    // Crear el tag destino
+    op_code rtaCrear = crearTag(f, t);
+    if (rtaCrear != OP_SUCCESS) {
+        return rtaCrear;
+    }
+
+    // Duplicar el contenido del tag origen al tag destino
+    op_code rtaDuplicar = duplicarFileTag(fOriginal, tOriginal, f, t);
+    if (rtaDuplicar != OP_SUCCESS) {
+        // Rollback: eliminar el tag destino que se creó
+        borrarTag(f, t);
+    }
+    return rtaDuplicar;
 }

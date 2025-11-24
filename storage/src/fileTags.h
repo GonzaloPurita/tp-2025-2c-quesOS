@@ -34,6 +34,17 @@ op_code crearFileTag(char* nombreFile, char* nombreTag);
 op_code crearTag(char* nombreFile, char* nombreTag);
 
 /**
+ * @brief Duplica un tag de origen a un tag de destino, creando una copia completa de todos los bloques.
+ * 
+ * @param fileOrigen Nombre del archivo que contiene el tag origen.
+ * @param tagOrigen Nombre del tag origen a duplicar.
+ * @param fileDestino Nombre del archivo donde se creará el tag destino.
+ * @param tagDestino Nombre del tag destino.
+ * @return op_code Código de operación que indica el resultado de la operación.
+ */
+op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, char* tagDestino);
+
+/**
  * @brief Obtiene la ruta completa de un fileTag dado el nombre del archivo y la etiqueta.
  * 
  * @param nombreFile Nombre del archivo asociado al fileTag.
