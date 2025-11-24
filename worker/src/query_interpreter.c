@@ -82,6 +82,17 @@ void ejercutar_query(char* path_query){
 
     // FETCH
     while(getline(&linea, &len, file) != -1){
+        // Eliminar \n manualmente SIN modificar el puntero
+        size_t largo = strlen(linea);
+        if (largo > 0 && linea[largo - 1] == '\n') {
+            linea[largo - 1] = '\0';
+        }
+        // También eliminar \r si existe (archivos de Windows)
+        largo = strlen(linea);
+        if (largo > 0 && linea[largo - 1] == '\r') {
+            linea[largo - 1] = '\0';
+        }
+
         // Solo ejecutamos si ya llegamos al PC_ACTUAL
         if (linea_actual >= PC_ACTUAL) {
 
@@ -212,9 +223,15 @@ void destruir_formato(t_formato* formato) {
 // le pide al storage que cree un archivo con un tag vacio
 void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREATE MATERIAS:BASE
     char* recurso = inst->parametros[0]; //MATERIAS:BASE
+    //string_trim_right(&recurso);
    
     // Mapear <NOMBRE_FILE>:<TAG> → t_formato
     t_formato* formato = mapear_formato(recurso);
+
+    if (formato == NULL) {
+        log_error(loggerWorker, "Error al mapear formato para CREATE");
+        return;
+    }
 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_CREATE;
@@ -226,15 +243,16 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     op_code rta = recibir_operacion(conexionStorage);
     manejar_respuesta_storage(rta, "CREATE");
 
-    log_info(loggerWorker,  "## Query %d: - Instrucción realizada: CREATE %s", query_actual->query_id, recurso);
-
+    log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+    
     destruir_formato(formato);
 }
 
 void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TAMAÑO> ej TRUNCATE MATERIAS:BASE 1024
     char* recurso = inst->parametros[0];
-    char* tamanio = inst->parametros[1]; // "1024"
-    log_debug(loggerWorker, "Ejecutando TRUNCATE %s %s", recurso, tamanio);
+    char* tamanio_str = inst->parametros[1]; // "1024"
+    log_debug(loggerWorker, "Ejecutando TRUNCATE %s %s", recurso, tamanio_str);
+    int tamanio = atoi(tamanio_str);
     
     // Mapear <NOMBRE_FILE>:<TAG> → t_formato
     t_formato* formato = mapear_formato(recurso);
@@ -243,7 +261,7 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     paquete->codigo_operacion = OP_TRUNCATE;
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
-    agregar_a_paquete(paquete, tamanio, strlen(tamanio) + 1);
+    agregar_a_paquete(paquete, &tamanio, sizeof(int));
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 

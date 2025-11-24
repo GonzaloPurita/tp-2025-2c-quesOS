@@ -46,6 +46,7 @@ void recibirCliente(void* cliente) {
                 datosEnviados = crearNuevoPaquete(TAMANIO_BLOQUE);
                 agregar_a_paquete(datosEnviados, &(superblock->blocksize), sizeof(int));
                 enviar_paquete(datosEnviados, socket_cliente);
+
                 break;
             }
             case OP_CREATE: {
@@ -87,10 +88,13 @@ void recibirCliente(void* cliente) {
 
         if (datosEnviados != NULL) {
             eliminar_paquete(datosEnviados);
+            datosEnviados = NULL;
         }
         if (datosRecibidos != NULL) {
             list_destroy_and_destroy_elements(datosRecibidos, free);
+            datosRecibidos = NULL;
         }
+        log_info(loggerStorage, "Operacion atendida correctamente.");
     }
 }
 

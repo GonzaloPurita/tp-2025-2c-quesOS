@@ -116,7 +116,6 @@ char* rutaFileTag(char* nombreFile, char* nombreTag) {
         log_error(loggerStorage, "Error generando ruta file tag, el nombre del file o del tag está vacío");
         return NULL;
     }
-
     char* ruta = rutaCompleta("/files/");
     string_append(&ruta, nombreFile);
     string_append(&ruta, "/");
@@ -347,6 +346,7 @@ bool cambiarEstadoMetaData(char* file, char* tag, t_estado_fileTag estadoNuevo) 
 op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag) {
     // Trabajar sobre una copia para no invalidar el puntero original del caller
     char* rutaTag = string_duplicate(rutaBase);
+    log_debug(loggerStorage, "Nombre del TAG: %s", nombreTag);
     string_append(&rutaTag, "/");
     string_append(&rutaTag, nombreTag);
     if (crearDirectorio(rutaTag) == -1) { // Me genera la carpeta con el nombre del tag.

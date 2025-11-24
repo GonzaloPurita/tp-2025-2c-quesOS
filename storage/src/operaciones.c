@@ -9,28 +9,33 @@ void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio
 op_code borrarTag(char* nombreFile, char* nombreTag);
 op_code commitTag(char* nombreFile, char* nombreTag);
 op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido);
+void logearResultadoOP(op_code resultado, char* operacion);
 
 void crearFile(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     op_code resultado = crearFileTag(nombreFile, nombreTag);
     enviarRespuesta(resultado, socket_cliente);
+    logearResultadoOP(resultado, "Crear FILE");
 }
 
 void truncar(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     int nuevoTamanio = *((int*) list_get(data, 2));
+    log_debug(loggerStorage, "Truncar file tag %s:%s a tamaño %d", nombreFile, nombreTag, nuevoTamanio);
 
     t_config* metadata = getMetaData(nombreFile, nombreTag);
 
     if (metadata == NULL) {
         enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
+        logearResultadoOP(ERROR_FILE_NOT_FOUND, "TRUNCAR");
         return;
     }
 
     if (strcmp("COMMITED", config_get_string_value(metadata, "ESTADO")) == 0) {
         enviarRespuesta(ERROR_WRITE_NOT_ALLOWED, socket_cliente);
+        logearResultadoOP(ERROR_WRITE_NOT_ALLOWED, "TRUNCAR");
         config_destroy(metadata);
         return;
     }
@@ -40,6 +45,7 @@ void truncar(t_list* data, int socket_cliente) {
 
     if(bloquesActuales == nuevoTamanio){
         enviarRespuesta(OP_SUCCESS, socket_cliente);
+        logearResultadoOP(OP_SUCCESS, "TRUNCAR");
     }
     else if(bloquesActuales < nuevoTamanio){
         agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, socket_cliente);
@@ -56,6 +62,8 @@ void tag(t_list* data, int socket_cliente) {
     char* nombreTag = list_get(data, 1);
     op_code resultado = crearTag(nombreFile, nombreTag);
     enviarRespuesta(resultado, socket_cliente);
+
+    logearResultadoOP(resultado, "Crear TAG");
 }
 
 void eliminarTag(t_list* data, int socket_cliente) {
@@ -63,6 +71,8 @@ void eliminarTag(t_list* data, int socket_cliente) {
     char* nombreTag = list_get(data, 1);
     op_code resultado = borrarTag(nombreFile, nombreTag);
     enviarRespuesta(resultado, socket_cliente);
+
+    logearResultadoOP(resultado, "Eliminar TAG");
 }
 
 void commit(t_list* data, int socket_cliente) {
@@ -70,6 +80,7 @@ void commit(t_list* data, int socket_cliente) {
     char* nombreTag = list_get(data, 1);
     op_code resultado = commitTag(nombreFile, nombreTag);
     enviarRespuesta(resultado, socket_cliente);
+    logearResultadoOP(resultado, "COMMIT");
 }
 
 void writeFileTag(t_list* data, int socket_cliente) {
@@ -80,6 +91,8 @@ void writeFileTag(t_list* data, int socket_cliente) {
     size_t sizeContenido = *((size_t*) list_get(data, 4));
     op_code resultado = escribirBloqueLogico(nombreFile, nombreTag, nroBloqueLogico, contenido, sizeContenido);
     enviarRespuesta(resultado, socket_cliente);
+
+    logearResultadoOP(resultado, "WRITE");
 }
 
 void readBloqueLogico(t_list* data, int socket_cliente) {
@@ -125,6 +138,7 @@ void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bl
     int i = bloquesActuales;
     bool error = false;
 
+    log_debug(loggerStorage, "bloquesActuales: %d, nuevoTamanio: %d", bloquesActuales, nuevoTamanio);
     for (; i < nuevoTamanio; i++) {
         if (!agregarBloqueLogicoHL(nombreFile, nombreTag, i, 0)) {
             error = true;
@@ -344,5 +358,13 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
         free(pathBloqueLogico);
         config_destroy(metadata);
         return OP_FAILED;
+    }
+}
+
+void logearResultadoOP(op_code resultado, char* operacion) {
+    if(resultado == OP_SUCCESS) {
+        log_debug(loggerStorage, "Operacion: %s exitosa!", operacion);
+    } else {
+        log_warning(loggerStorage, "Operacion: %s finalizada con error: %d", operacion, resultado);
     }
 }
