@@ -76,7 +76,7 @@ void recibirCliente(void* cliente) {
                 writeFileTag(datosRecibidos, socket_cliente);
                 break;
             }
-            case PED_PAG: { //era OP_READ pero la cambie xq ya tengo op_read en worker
+            case PED_PAG: { // era OP_READ pero la cambie xq ya tengo op_read en worker
                 usleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
                 readBloqueLogico(datosRecibidos, socket_cliente);
                 break;

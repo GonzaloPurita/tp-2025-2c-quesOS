@@ -319,10 +319,13 @@ void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
     eliminar_paquete(paquete);
 
     op_code rta = recibir_operacion(conexionStorage);
+    t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "DELETE");
+
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
 
+    list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
 }
 
@@ -352,10 +355,13 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     eliminar_paquete(paquete);
 
     op_code rta = recibir_operacion(conexionStorage);
+    t_list* rtaP = recibir_paquete(conexionStorage);
+    
     manejar_respuesta_storage(rta, "COMMIT");
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
 
+    list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
 }
 

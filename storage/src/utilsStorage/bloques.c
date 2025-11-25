@@ -277,3 +277,49 @@ int obtenerNumeroBloqueFisico(const char* nombreBloque) {
     int numeroBloque = atoi(nombreBloque + 5);
     return numeroBloque;
 }
+
+bool actualizarBloqueFileTag(t_config* metadata, int nroBloqueLogico, int nroBloqueFisico) {
+    if (metadata == NULL || nroBloqueLogico < 0 || nroBloqueFisico < 0) {
+        log_error(loggerStorage, "Error actualizando bloque en metadata, parámetros inválidos");
+        return false;
+    }
+
+    char** bloques = config_get_array_value(metadata, "BLOCKS");
+    if (bloques == NULL) {
+        log_error(loggerStorage, "Error actualizando bloque en metadata, no se pudo obtener la lista de bloques");
+        return false;
+    }
+
+    int len = string_array_size(bloques);
+    if (nroBloqueLogico >= len) {
+        log_error(loggerStorage, "Error actualizando bloque en metadata, el número de bloque lógico %d está fuera de los límites (tamaño actual: %d)", nroBloqueLogico, len);
+        string_array_destroy(bloques);
+        free(bloques);
+        return false;
+    }
+
+    // Actualizar el bloque lógico con el nuevo bloque físico
+    bloques[nroBloqueLogico] = string_itoa(nroBloqueFisico);
+
+    // Reconstruir el string de bloques actualizado
+    char* bloquesActualizados = string_new();
+    string_append(&bloquesActualizados, "[");
+    for (int i = 0; i < len; i++) {
+        string_append(&bloquesActualizados, bloques[i]);
+        if (i < len - 1) {
+            string_append(&bloquesActualizados, ",");
+        }
+    }
+    string_append(&bloquesActualizados, "]");
+
+    // Actualizar y guardar la metadata
+    config_set_value(metadata, "BLOCKS", bloquesActualizados);
+    config_save(metadata);
+
+    // Liberar memoria
+    string_array_destroy(bloques);
+    free(bloques);
+    free(bloquesActualizados);
+
+    return true;
+}

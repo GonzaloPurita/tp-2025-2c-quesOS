@@ -346,9 +346,11 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
 
     int bloqueFisico;
     if(esHardlinkUnico(pathBloqueLogico)) { // Como es HL unico, puedo escribir directamente en el bloque fisico
+        log_debug(loggerStorage, "DEBUG: Hardlink único para %s", pathBloqueLogico);
         bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
     } else {
         // El bloque tiene mas de un Hardlink -> Le asigno uno nuevo
+        log_debug(loggerStorage, "DEBUG: Hardlink múltiple para %s", pathBloqueLogico);
         bloqueFisico = obtenerBloqueLibre();
         if (bloqueFisico == -1) {
             free(pathBloqueLogico);
@@ -363,6 +365,12 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
             return OP_FAILED;
         }
         if (!crearHardlink(pathFolder, numeroBloqueLogico, bloqueFisico)) {
+            free(pathBloqueLogico);
+            free(pathFolder);
+            config_destroy(metadata);
+            return OP_FAILED;
+        }
+        if(!actualizarBloqueFileTag(metadata, numeroBloqueLogico, bloqueFisico)) {
             free(pathBloqueLogico);
             free(pathFolder);
             config_destroy(metadata);

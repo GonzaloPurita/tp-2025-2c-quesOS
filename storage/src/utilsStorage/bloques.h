@@ -130,4 +130,14 @@ char* leerBloqueFisico(int numeroBloqueFisico);
  */
 int obtenerNumeroBloqueFisico(const char* nombreBloque);
 
+/**
+ * @brief Actualiza el bloque lógico en la metadata del FileTag.
+ * 
+ * @param metadata Puntero a la metadata del FileTag.
+ * @param nroBloqueLogico Número del bloque lógico a actualizar.
+ * @param nroBloqueFisico Nuevo número del bloque físico a asociar.
+ * @return true si la actualización fue exitosa, false en caso de error.
+ */
+bool actualizarBloqueFileTag(t_config* metadata, int nroBloqueLogico, int nroBloqueFisico);
+
 #endif /* _BLOQUES_H_ */

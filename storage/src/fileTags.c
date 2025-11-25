@@ -423,7 +423,7 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
             valor = atoi(bloques[i]);
         }
         if (i == numeroBloqueLogico) {
-            log_info(loggerStorage, "DEBUG LOOP: i=%d Coincide! Cambiando valor %d por %d", i, valor, numeroBloqueFisico);
+            // log_info(loggerStorage, "DEBUG LOOP: i=%d Coincide! Cambiando valor %d por %d", i, valor, numeroBloqueFisico);
             valor = numeroBloqueFisico;
         }
         char* svalor = string_itoa(valor);
@@ -432,7 +432,7 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
         if (i < lenNuevo - 1) string_append(&bloquesActualizados, ",");
     }
     string_append(&bloquesActualizados, "]");
-    log_info(loggerStorage, "Actualizando Metadata %s:%s -> BLOCKS=%s", file, tag, bloquesActualizados);
+    //log_info(loggerStorage, "Actualizando Metadata %s:%s -> BLOCKS=%s", file, tag, bloquesActualizados);
 
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     config_save(metadata);
@@ -454,14 +454,6 @@ op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, ch
     if(metaDataOriginal == NULL) {
         log_error(loggerStorage,"El tag origen %s:%s no existe", fileOrigen, tagOrigen);
         return ERROR_FILE_NOT_FOUND;
-    }
-
-    // Validar que el tag origen esté en estado COMMITED
-    char* estado = config_get_string_value(metaDataOriginal, "ESTADO");
-    if (strcmp(estado, "COMMITED") != 0) {
-        log_error(loggerStorage, "El tag origen %s:%s no está en estado COMMITED (estado actual: %s)", fileOrigen, tagOrigen, estado);
-        config_destroy(metaDataOriginal);
-        return ERROR_WRITE_NOT_ALLOWED;
     }
 
     // Copiar los bloques del tag origen al tag destino
