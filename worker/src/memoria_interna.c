@@ -189,12 +189,15 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
 
     int marco = obtener_marco_libre_o_victima();
 
+    int paginasXbloque = TAM_MEMORIA / TAM_BLOQUE;
+    int nro_bloque = nro_pagina / paginasXbloque;
+
     // paquete para Storage (enviamos nro_pagina)
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
-    agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
+    agregar_a_paquete(paquete, &nro_bloque, sizeof(int));
 
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
@@ -205,7 +208,9 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
         t_list* lista = recibir_paquete(conexionStorage);
         char* contenido = list_get(lista, 0);
 
-        memcpy(MEMORIA + marco * TAM_PAGINA, contenido, TAM_PAGINA); // copio el contenido recibido en el marco asignado
+        int offset_en_bloque = (nro_pagina % paginasXbloque) * TAM_PAGINA;
+
+        memcpy(MEMORIA + marco * TAM_PAGINA, contenido + offset_en_bloque, TAM_PAGINA); // copio el contenido recibido en el marco asignado
 
         // seteo el frame
         frames[marco].ocupado = true;
