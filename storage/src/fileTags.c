@@ -423,6 +423,7 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
             valor = atoi(bloques[i]);
         }
         if (i == numeroBloqueLogico) {
+            log_info(loggerStorage, "DEBUG LOOP: i=%d Coincide! Cambiando valor %d por %d", i, valor, numeroBloqueFisico);
             valor = numeroBloqueFisico;
         }
         char* svalor = string_itoa(valor);
@@ -431,6 +432,7 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
         if (i < lenNuevo - 1) string_append(&bloquesActualizados, ",");
     }
     string_append(&bloquesActualizados, "]");
+    log_info(loggerStorage, "Actualizando Metadata %s:%s -> BLOCKS=%s", file, tag, bloquesActualizados);
 
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     config_save(metadata);

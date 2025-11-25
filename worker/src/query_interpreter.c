@@ -404,7 +404,12 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
     // enviar el resultado al Master
     t_paquete* respuesta = crear_paquete();
     respuesta->codigo_operacion = OP_READ;
-    agregar_a_paquete(respuesta, contenido, strlen(contenido) + 1);
+    // agregar_a_paquete(respuesta, contenido, strlen(contenido) + 1);
+
+    agregar_a_paquete(respuesta, &query_actual->query_id, sizeof(int));
+    agregar_a_paquete(respuesta, &tamanio, sizeof(int));
+    agregar_a_paquete(respuesta, contenido, tamanio);
+
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);
 
@@ -469,15 +474,11 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
         free(clave_tabla);
         destruir_formato(formato);
         return;
+    }else {
+        flush_paginas_modificadas_de_tabla(tabla, formato);
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
     }
-    // flushea todas las páginas modificadas
-    flush_paginas_modificadas_de_tabla(tabla, formato);
-
-    op_code rta = recibir_operacion(conexionStorage);
-    manejar_respuesta_storage(rta, "FLUSH");
-
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
-
+    
     free(clave_tabla);
     destruir_formato(formato);
 }
@@ -501,14 +502,15 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
             char* contenido = malloc(TAM_PAGINA);
             memcpy(contenido, MEMORIA + dir_fisica, TAM_PAGINA);
 
-            // Armo paquete: usar GUARDAR_MODIFICADAS por bloque
+            // Armo paquete: usar OP_WRITE por bloque
             t_paquete* paquete = crear_paquete();
-            paquete->codigo_operacion = GUARDAR_MODIFICADAS;
-            // ESTRUCTURA DEL PAQUETE: [nro_pagina(int), file_name, tag, contenido(TAM_PAGINA)]
-            agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
+            paquete->codigo_operacion = OP_WRITE;
+            // Orden esperado por Storage: [File, Tag, NroBloque, Contenido, Tamaño]
             agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
             agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
+            agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
             agregar_a_paquete(paquete, contenido, TAM_PAGINA);
+            agregar_a_paquete(paquete, &TAM_PAGINA, sizeof(int));
 
             enviar_paquete(paquete, conexionStorage);
             eliminar_paquete(paquete);
@@ -517,6 +519,16 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
             // int resp = recibir_operacion(conexionStorage);
             // if (resp != RTA_OK) { log_error(...); /* manejar error */ }
             // --------------------------------------------------------------------
+
+            op_code rta = recibir_operacion(conexionStorage);
+            t_list* rtaList = recibir_paquete(conexionStorage);
+            list_destroy_and_destroy_elements(rtaList, free);
+            
+            if (rta != OP_SUCCESS) {
+                log_error(loggerWorker, "Fallo al flushear pagina %d", nro_pagina);
+            } else {
+                log_debug(loggerWorker, "Página %d flusheada correctamente", nro_pagina);
+            }
 
             // marco q no esta modificada la pag
             entrada->modificado = false;

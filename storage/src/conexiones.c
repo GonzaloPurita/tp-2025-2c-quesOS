@@ -72,12 +72,12 @@ void recibirCliente(void* cliente) {
                 break;
             }
             case OP_WRITE: {
-                sleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
+                usleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
                 writeFileTag(datosRecibidos, socket_cliente);
                 break;
             }
-            case OP_READ: {
-                sleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
+            case PED_PAG: { //era OP_READ pero la cambie xq ya tengo op_read en worker
+                usleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
                 readBloqueLogico(datosRecibidos, socket_cliente);
                 break;
             }

@@ -26,7 +26,7 @@ bool esta_en_memoria(t_formato* formato, int nro_pagina) {
     free(clave_tabla);
 
     if (tabla == NULL) {
-        log_error(loggerWorker, "No existe tabla de páginas para %s:%s", formato->file_name, formato->tag);
+        log_info(loggerWorker, "No existe tabla de páginas para %s:%s", formato->file_name, formato->tag);
         return false;
     }
 
@@ -186,19 +186,22 @@ int elegir_victima_CLOCKM() {
 }
 
 void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
-    int marco = obtener_marco_libre_o_victima();
-    int base_pagina = nro_pagina * TAM_PAGINA;
 
+    int marco = obtener_marco_libre_o_victima();
+
+    // paquete para Storage (enviamos nro_pagina)
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
-    agregar_a_paquete(paquete, &base_pagina, sizeof(int));
+    agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
+
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
     op_code cod_op = recibir_operacion(conexionStorage);
-    if (cod_op == PED_PAG) {
+
+    if (cod_op == OP_SUCCESS) {
         t_list* lista = recibir_paquete(conexionStorage);
         char* contenido = list_get(lista, 0);
 
@@ -208,24 +211,46 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
         frames[marco].ocupado = true;
         frames[marco].modificado = false;
         frames[marco].uso = true;
+
         frames[marco].file = strdup(formato->file_name);
         frames[marco].tag = strdup(formato->tag);
         frames[marco].page_num = nro_pagina;
         frames[marco].timestamp = obtener_timestamp();
 
         // actualizo la tabla de páginas
-        char* clave = string_itoa(nro_pagina);
-        tabla_pag* tabla = dictionary_get(diccionario_tablas, string_from_format("%s:%s", formato->file_name, formato->tag));
+        char* clave_file_tag = string_from_format("%s:%s", formato->file_name, formato->tag);
+        ////char* clave = string_itoa(nro_pagina);
+        // busco en la tabla
+        tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_file_tag);
+
+        //si la tabla no existe (si es la primera escritura) ser crea!!!!
+        if(tabla == NULL){
+            log_info(loggerWorker, "Creando tabla de páginas nueva para %s:%s", formato->file_name, formato->tag);
+            tabla = malloc(sizeof(tabla_pag));
+            tabla->file = strdup(formato->file_name);
+            tabla->tag = strdup(formato->tag);
+            tabla->paginas = dictionary_create();
+            dictionary_put(diccionario_tablas, clave_file_tag, tabla);
+        }
+        free(clave_file_tag);
+
+        // ahora q nos aseguramos q la tabla existe..
+        char* clave_pagina = string_itoa(nro_pagina);
         entrada_pag* entrada = malloc(sizeof(entrada_pag));
         entrada->indice_frame = marco;
         entrada->presente = true;
         entrada->modificado = false;
         entrada->uso = true;
-        dictionary_put(tabla->paginas, clave, entrada);
+        
+        dictionary_put(tabla->paginas, clave_pagina, entrada);
+        free(clave_pagina);
 
-        free(clave);
         list_destroy_and_destroy_elements(lista, free);
-
         log_debug(loggerWorker, "Contenido de página %d recibido desde Storage en marco %d", nro_pagina, marco);
+    } else {
+        // si Storage no responde SUCCESS
+        log_error(loggerWorker, "Fallo al pedir página al Storage. Código recibido: %d", cod_op);
+        t_list* basura = recibir_paquete(conexionStorage);
+        list_destroy_and_destroy_elements(basura, free);
     }
 }

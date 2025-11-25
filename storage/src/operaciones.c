@@ -95,8 +95,11 @@ void writeFileTag(t_list* data, int socket_cliente) {
     char* nombreFile = list_get(data, 0);
     char* nombreTag = list_get(data, 1);
     int nroBloqueLogico = *((int*) list_get(data, 2));
+
+    log_info(loggerStorage, "DEBUG WRITE: File=%s Tag=%s BloqueLogico=%d", nombreFile, nombreTag, nroBloqueLogico);
+
     void* contenido = list_get(data, 3);
-    size_t sizeContenido = *((size_t*) list_get(data, 4));
+    int sizeContenido = *((int*) list_get(data, 4));
     op_code resultado = escribirBloqueLogico(nombreFile, nombreTag, nroBloqueLogico, contenido, sizeContenido);
     enviarRespuesta(resultado, socket_cliente);
 
@@ -333,8 +336,10 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
     }
 
     // Ruta al bloque lógico
-    char* pathBloqueLogico = rutaFileTag(nombreFile, nombreTag);
-    string_append(&pathBloqueLogico, "/logical_blocks/");
+    char* pathFolder = rutaFileTag(nombreFile, nombreTag);
+    string_append(&pathFolder, "/logical_blocks/");
+
+    char* pathBloqueLogico = string_duplicate(pathFolder);
     char* nombreBloqueLogico = crearNombreBloque(numeroBloqueLogico);
     string_append(&pathBloqueLogico, nombreBloqueLogico);
     free(nombreBloqueLogico);
@@ -347,26 +352,33 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
         bloqueFisico = obtenerBloqueLibre();
         if (bloqueFisico == -1) {
             free(pathBloqueLogico);
+            free(pathFolder);
             config_destroy(metadata);
             return ERROR_NO_SPACE;
         }
         if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico)) {
             free(pathBloqueLogico);
+            free(pathFolder);
             config_destroy(metadata);
             return OP_FAILED;
         }
-        if (!crearHardlink(pathBloqueLogico, numeroBloqueLogico, bloqueFisico)) {
+        if (!crearHardlink(pathFolder, numeroBloqueLogico, bloqueFisico)) {
             free(pathBloqueLogico);
+            free(pathFolder);
             config_destroy(metadata);
             return OP_FAILED;
         }
     }
+    log_info(loggerStorage, "DEBUG: Escribiendo en Bloque Fisico Asignado: %d", bloqueFisico);
     if(escribirBloqueFisico(bloqueFisico, datos, sizeDatos, false)) {
+
         free(pathBloqueLogico);
+        free(pathFolder);
         config_destroy(metadata);
         return OP_SUCCESS;
     } else { // TODO: Quizas estaría bueno que devuelva mas info, pero mucho refactor zzz
         free(pathBloqueLogico);
+        free(pathFolder);
         config_destroy(metadata);
         return OP_FAILED;
     }
