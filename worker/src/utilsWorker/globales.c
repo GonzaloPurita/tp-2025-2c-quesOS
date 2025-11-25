@@ -46,5 +46,7 @@ void iniciar_memoria(){
 
     sem_init(&mutex_memoria, 0, 1);
 
+   diccionario_tablas = dictionary_create();
+
     log_debug(loggerWorker, "Memoria interna inicializada. TAM_MEMORIA=%d, TAM_PAGINA=%d, MARCOS=%d", TAM_MEMORIA, TAM_PAGINA, CANTIDAD_MARCOS);
 }
