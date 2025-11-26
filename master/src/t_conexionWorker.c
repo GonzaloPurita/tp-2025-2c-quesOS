@@ -283,7 +283,7 @@ void* atenderWorker(void* arg){
 
             // 6) Enviar respuesta al Query Control
             t_paquete* r = crear_paquete();
-            r->codigo_operacion = OP_END;
+            r->codigo_operacion = QUERY_FINALIZADA;
             agregar_a_paquete(r, &qid, sizeof(int));
             enviar_paquete(r, fd_qc);
             eliminar_paquete(r);
@@ -319,7 +319,7 @@ void* atenderWorker(void* arg){
 
             // 2) Forward al Query Control
             t_paquete* out = crear_paquete();
-            out->codigo_operacion = MENSAJE_LECTURA;   // tu opcode hacia el QC
+            out->codigo_operacion = MENSAJE_LECTURA;   
             agregar_a_paquete(out, &qid, sizeof(int));
             agregar_a_paquete(out, &n,   sizeof(int));
             agregar_a_paquete(out, buf,  n);
@@ -346,7 +346,6 @@ void* atenderWorker(void* arg){
 
         default:
             log_warning(loggerMaster, "Worker %s: op_code desconocido %d", id, codigoOperacion);
-            // Si el op desconocido tenía payload, tu worker está mandando cualquier cosa.
             break;
         }
     }
