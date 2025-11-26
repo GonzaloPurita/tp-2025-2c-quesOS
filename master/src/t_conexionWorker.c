@@ -236,7 +236,7 @@ void* atenderWorker(void* arg){
 
             // 2) Despertar al hilo desalojar() para que envíe la nueva query
             sem_post(&conexionWorker->semaforo);
-            break;
+            return NULL;
         }
         case OP_END: {
             // 1) Recibir el paquete del Worker

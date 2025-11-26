@@ -72,7 +72,10 @@ void planificarConDesalojoYAging() {
     if (query->prioridad_actual < prioridadVictima) {
         log_debug(loggerMaster, "Desalojo por prioridad");
         realizarDesalojo(candidatoDesalojo, query);
-    }
+    }  else {
+    // La nueva query no tiene mayor prioridad, queda en ready
+    log_debug(loggerMaster, "Query %d (p=%d) no desaloja a %d (p=%d), se queda en READY", query->QCB->QID, query->prioridad_actual, candidatoDesalojo->QCB->QID, prioridadVictima);
+}
 
   }
 }
@@ -148,27 +151,12 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     // 1) Logs y métricas
     log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades", candidatoDesalojo->QCB->QID);
 
-    // 2) Movemos a las queries de colas
-    pthread_mutex_lock(&mutex_cola_exec);
-    list_remove_element(cola_exec, candidatoDesalojo);
-    list_add(cola_exec, nuevoQuery);
-    pthread_mutex_unlock(&mutex_cola_exec);
-
-    pthread_mutex_lock(&mutex_cola_ready);
-    list_remove_element(cola_ready, nuevoQuery);
-    // reinsertamos a ready manteniendo prioridad
-    agregarAReadyPorPrioridad(candidatoDesalojo);
-    pthread_mutex_unlock(&mutex_cola_ready);
-
-    actualizarMetricas(Q_EXEC, Q_READY, candidatoDesalojo);
-    actualizarMetricas(Q_READY, Q_EXEC, nuevoQuery);
-
-    // 3) Preparamos el hilo para hacer el desalojo
+    // 2) Preparar datos para el desalojo
     t_datos_desalojo* datos = malloc(sizeof(t_datos_desalojo));
     datos->candidatoDesalojo = candidatoDesalojo;
     datos->nuevoQuery = nuevoQuery;
 
-    // buscamos el worker en el que está ejecutando la query
+    // 3) Buscar el worker que está ejecutando la víctima
     datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->QID);
     if (datos->worker == NULL) {
         log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->QID);
@@ -176,7 +164,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
         return;
     }
 
-    // 4) Lanzar hilo que hace el prempteo
+    // 4) Lanzar hilo que hace el desalojo
     pthread_t hiloDesalojo;
     pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
     pthread_detach(hiloDesalojo);
@@ -185,17 +173,32 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
 void* desalojar(void* arg) {
     t_datos_desalojo* d = (t_datos_desalojo*) arg;
 
-    // A) Pedimos el preempt al worker
+    // 1) Pedimos el preempt al worker
     t_paquete* p = crear_paquete();
     p->codigo_operacion = DESALOJO;
     agregar_a_paquete(p, &d->candidatoDesalojo->QCB->QID, sizeof(int));
     enviar_paquete(p, d->worker->fd);
     eliminar_paquete(p);
 
-   // B) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
+   // 2) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
     sem_wait(&d->worker->semaforo);
+   
+   // 3) Movemos las queries entre colas
 
-    // C) Mandamos la query nueva a ese worker
+    pthread_mutex_lock(&mutex_cola_exec);
+    list_remove_element(cola_exec, d->candidatoDesalojo);
+    list_add(cola_exec, d->nuevoQuery);
+    pthread_mutex_unlock(&mutex_cola_exec);
+
+    pthread_mutex_lock(&mutex_cola_ready);
+    list_remove_element(cola_ready, d->nuevoQuery);
+    agregarAReadyPorPrioridad(d->candidatoDesalojo);
+    pthread_mutex_unlock(&mutex_cola_ready);
+
+    actualizarMetricas(Q_EXEC, Q_READY, d->candidatoDesalojo);
+    actualizarMetricas(Q_READY, Q_EXEC, d->nuevoQuery);
+
+    // 4) Mandamos la query nueva a ese worker
     enviarQueryAWorkerEspecifico(d->nuevoQuery, d->worker);
 
     free(d);
