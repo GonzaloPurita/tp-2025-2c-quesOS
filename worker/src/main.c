@@ -21,7 +21,9 @@ int main(int argc, char* argv[]) {
     //enviar ID a Master
     enviar_identificador_a_master(id);
     
-    //pthread_create(&hilo_listener, NULL, listener_master, NULL); // hilo que escucha interrupciones del Master
+    pthread_t hilo_master;
+    pthread_create(&hilo_master, NULL, hilo_escuchar_master, NULL);
+    pthread_detach(hilo_master);
 
     recibir_queries();
 

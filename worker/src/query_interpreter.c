@@ -57,10 +57,6 @@ void recibir_queries() {
                 atomic_store(&interrupt_flag, 0);
             }
         }
-        else if (cod_op == DESALOJO) {
-            log_debug(loggerWorker, "Master pidió desalojo (detectado en hilo principal)");
-            atomic_store(&interrupt_flag, 1);
-        }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
         }
@@ -100,6 +96,15 @@ void ejercutar_query(char* path_query){
                 log_debug(loggerWorker, "## Query %d abortada por error del Storage", query_actual ? query_actual->query_id : -1);
                 break;
             }
+            if (atomic_load(&interrupt_flag)) {
+                log_info(loggerWorker, "## Query %d: Desalojo detectado en PC=%d", query_actual->query_id, PC_ACTUAL);
+                free(linea);
+                fclose(file);
+                guardar_paginas_modificadas();
+                notificar_master_desalojo(PC_ACTUAL);
+                atomic_store(&interrupt_flag, 0);
+                return;
+            }
 
             log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
@@ -117,6 +122,25 @@ void ejercutar_query(char* path_query){
 
     free(linea);
     fclose(file);
+}
+
+void* hilo_escuchar_master(void* arg) {
+    while (1) {
+        int cod_op = recibir_operacion(conexionMaster);
+        if (cod_op <= 0) {
+            log_error(loggerWorker, "Master desconectado");
+            break;
+        }
+        
+        if (cod_op == DESALOJO) {
+            log_info(loggerWorker, "## DESALOJO recibido del Master");
+            atomic_store(&interrupt_flag, 1);
+        }
+        else {
+            log_warning(loggerWorker, "Operación inesperada en hilo_escuchar: %d", cod_op);
+        }
+    }
+    return NULL;
 }
 
 //convierto la instruccion cruda (osea la linea) en un enum
