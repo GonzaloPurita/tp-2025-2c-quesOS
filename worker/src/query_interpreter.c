@@ -406,6 +406,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
     }
 
     char* contenido = leer_desde_memoria(formato, direccion_base, tamanio);
+    log_info(loggerWorker, "Contenido leído de memoria para READ %s dir_base=%d tam=%d: %s", recurso, direccion_base, tamanio, contenido);
 
     // enviar el resultado al Master
     t_paquete* respuesta = crear_paquete();

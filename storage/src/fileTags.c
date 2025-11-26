@@ -122,7 +122,7 @@ char* rutaFileTag(char* nombreFile, char* nombreTag) {
     string_append(&ruta, nombreTag);
 
     if(!directorioExiste(ruta)) {
-        log_error(loggerStorage, "Error generando ruta file tag, la ruta %s no existe", ruta);
+        log_warning(loggerStorage, "La ruta %s no existe", ruta);
         free(ruta);
         return NULL;
     }

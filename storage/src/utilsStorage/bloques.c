@@ -318,7 +318,6 @@ bool actualizarBloqueFileTag(t_config* metadata, int nroBloqueLogico, int nroBlo
 
     // Liberar memoria
     string_array_destroy(bloques);
-    free(bloques);
     free(bloquesActualizados);
 
     return true;
