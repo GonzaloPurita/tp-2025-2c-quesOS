@@ -239,23 +239,27 @@ void* atenderWorker(void* arg){
             break;
         }
         case OP_END: {
-            // payload: [qid:int][rc:int]   rc = código de retorno de la query
+            // 1) Recibir el paquete del Worker
             t_list* p = recibir_paquete(fd);
             if (list_size(p) < 1) {
                 log_error(loggerMaster, "Worker %s: OP_END mal formado", id);
                 list_destroy_and_destroy_elements(p, free);
                 break;
             }
+            
             int qid = *(int*) list_get(p, 0);
-
             list_destroy_and_destroy_elements(p, free);
 
-             // sacar de EXEC -> EXIT
+            // 2) Buscar y sacar de EXEC -> EXIT
             pthread_mutex_lock(&mutex_cola_exec);
             t_query* q = NULL;
             for (int i = 0; i < list_size(cola_exec); i++) {
                 t_query* it = list_get(cola_exec, i);
-                if (it->QCB->QID == qid) { q = it; list_remove(cola_exec, i); break; }
+                if (it->QCB->QID == qid) {
+                    q = it;
+                    list_remove(cola_exec, i);
+                    break;
+                }
             }
             pthread_mutex_unlock(&mutex_cola_exec);
 
@@ -263,28 +267,29 @@ void* atenderWorker(void* arg){
                 log_warning(loggerMaster, "OP_END: QID=%d no estaba en EXEC", qid);
                 break;
             }
+
+            // 3) Guardar fd_qc antes de pasar la query a exit
+            int fd_qc = q->fd_qc;
+
+            // 4) Movemos la query a exit
             actualizarMetricas(Q_EXEC, Q_EXIT, q);
             pthread_mutex_lock(&mutex_cola_exit);
             list_add(cola_exit, q);
             pthread_mutex_unlock(&mutex_cola_exit);
 
-            // marcar Worker libre y avisar al planificador de stock de workers
+            // 5) Marcamos el Worker como libre
             worker_marcar_libre_por_fd(fd);
             sem_post(&sem_workers_disponibles);
 
-            int fd_qc;
-            if (exec_buscar_por_qid(qid, &fd_qc)) {
-                t_paquete* r = crear_paquete();
-                r->codigo_operacion = OP_END;      // Master -> QC
-                agregar_a_paquete(r, &qid, sizeof(int));
-                enviar_paquete(r, fd_qc);
-                eliminar_paquete(r);
-            } else {
-                log_warning(loggerMaster, "OP_END: no encontré fd_qc para QID=%d", qid);
-            }
+            // 6) Enviar respuesta al Query Control
+            t_paquete* r = crear_paquete();
+            r->codigo_operacion = OP_END;
+            agregar_a_paquete(r, &qid, sizeof(int));
+            enviar_paquete(r, fd_qc);
+            eliminar_paquete(r);
 
             log_info(loggerMaster, "## Query %d finalizada en Worker %s", qid, id);
-            break;
+            return NULL;
         }
 
         case OP_READ: {

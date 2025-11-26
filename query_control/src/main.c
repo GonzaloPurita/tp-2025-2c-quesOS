@@ -27,7 +27,6 @@ int main(int argc, char* argv[]) {
     agregar_a_paquete(paquete, &strlen_path, sizeof(int));
     agregar_a_paquete(paquete, path_query, strlen(path_query) + 1);
     enviar_paquete(paquete, conexion);
-
     log_info(loggerQueryControl, "## Solicitud de ejecución de Query: %s, prioridad: %d",
              path_query, prioridad);
 
