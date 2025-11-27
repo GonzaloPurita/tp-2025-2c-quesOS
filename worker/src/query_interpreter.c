@@ -69,6 +69,7 @@ void* correr_query_en_hilo(void* arg) {
     log_info(loggerWorker, "## Query %d: Ejecutando script: %s", query_actual->query_id, path_query);
     
     t_estado_query estado = ejecutar_query(path_query); 
+    log_debug(loggerWorker, "## Query %d: Ejecución finalizada con estado %d", query_actual->query_id, estado);
 
     switch (estado) {
         case QUERY_DESALOJADA:
@@ -137,6 +138,8 @@ t_estado_query ejecutar_query(char* path_query) {
             t_instruccion* inst = decode(linea);
             execute(inst);
             destruir_instruccion(inst);
+
+            log_debug(loggerWorker, "SIGUIENTEEEEEE");
             
             PC_ACTUAL++;
 
