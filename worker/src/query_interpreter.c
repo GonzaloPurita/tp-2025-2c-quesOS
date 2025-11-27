@@ -5,10 +5,12 @@
 t_query_context* query_actual;
 
 void recibir_queries() {
-    atomic_store(&query_error_flag, 0); // seteo la flag de error
+    atomic_store(&query_error_flag, 0);
+    atomic_store(&interrupt_flag, 0);
 
     while (1) {
         int cod_op = recibir_operacion(conexionMaster);
+        
         if (cod_op <= 0) {
             log_error(loggerWorker, "Master desconectado o error en recibir_operacion (op=%d)", cod_op);
             break;
@@ -19,7 +21,7 @@ void recibir_queries() {
             t_list* paquete = recibir_paquete(conexionMaster);
 
             if (!paquete || list_size(paquete) < 3) {
-                log_error(loggerWorker, "Error: No se recibieron suficientes datos para la query.");
+                log_error(loggerWorker, "Error: Datos insuficientes en QCB.");
                 if (paquete) list_destroy_and_destroy_elements(paquete, free);
                 continue;
             }
@@ -28,34 +30,30 @@ void recibir_queries() {
             int* pc_inicial = list_get(paquete, 1);
             char* nombre_query = list_get(paquete, 2);
 
-            if (!query_id || !nombre_query || !pc_inicial) {
-                log_error(loggerWorker, "Error: datos inválidos de query recibidos");
-                list_destroy_and_destroy_elements(paquete, free);
-                continue;
-            }
-
+            if (query_actual) free(query_actual); // Limpieza por si quedó algo sucio
+            
             query_actual = malloc(sizeof(t_query_context));
             query_actual->query_id = *query_id;
             query_actual->pc_inicial = *pc_inicial;
             query_actual->nombre_query = strdup(nombre_query);
             PC_ACTUAL = *pc_inicial;
 
-            char *path_query = string_new();
-            string_append(&path_query, configWorker->path_scripts);
-            string_append(&path_query, nombre_query);
+            atomic_store(&interrupt_flag, 0);
+            atomic_store(&query_error_flag, 0);
 
-            log_info(loggerWorker, "## Query %d: Se recibe la Query. El path de operaciones es: %s",
-                     query_actual->query_id, path_query);
-
-            ejercutar_query(path_query);
+            pthread_t hilo_cpu;
+            if (pthread_create(&hilo_cpu, NULL, (void*)correr_query_en_hilo, NULL) != 0) {
+                log_error(loggerWorker, "Error al crear el hilo de ejecución");
+            } else {
+                pthread_detach(hilo_cpu);
+                log_info(loggerWorker, "## Query %d: Hilo de CPU iniciado.", query_actual->query_id);
+            }
 
             list_destroy_and_destroy_elements(paquete, free);
-
-            if (atomic_load(&interrupt_flag)) {
-                guardar_paginas_modificadas();
-                notificar_master_desalojo(PC_ACTUAL);
-                atomic_store(&interrupt_flag, 0);
-            }
+        }
+        else if (cod_op == DESALOJO) {
+            log_warning(loggerWorker, "Master pidió desalojo (Hilo Principal)");
+            atomic_store(&interrupt_flag, 1);
         }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
@@ -63,84 +61,99 @@ void recibir_queries() {
     }
 }
 
+void* correr_query_en_hilo(void* arg) {
+    char *path_query = string_new();
+    string_append(&path_query, configWorker->path_scripts);
+    string_append(&path_query, query_actual->nombre_query);
 
-void ejercutar_query(char* path_query){
+    log_info(loggerWorker, "## Query %d: Ejecutando script: %s", query_actual->query_id, path_query);
+    
+    t_estado_query estado = ejecutar_query(path_query); 
+
+    switch (estado) {
+        case QUERY_DESALOJADA:
+            log_info(loggerWorker, "## Query %d: Desalojada. Guardando contexto...", query_actual->query_id);
+            // TODO: Usar instrucción FLUSH
+            guardar_paginas_modificadas();
+            notificar_master_desalojo(PC_ACTUAL);
+            break;
+
+        case QUERY_EXITO:
+            log_info(loggerWorker, "## Query %d: Finalizada exitosamente (EXIT)", query_actual->query_id);
+            // TODO: Hay que notificar al Master que terminó la query?
+            break;
+
+        case QUERY_ERROR:
+            log_error(loggerWorker, "## Query %d: Finalizada por error", query_actual->query_id);
+            // TODO: Hay que notificar al Master que hubo error?
+            break;
+    }
+
+    free(query_actual->nombre_query);
+    free(query_actual);
+    atomic_store(&interrupt_flag, 0); 
+    
+    return NULL;
+}
+
+t_estado_query ejecutar_query(char* path_query) {
     FILE* file = fopen(path_query, "r");
-    if(file == NULL){
+    if (file == NULL) {
         log_error(loggerWorker, "No se pudo abrir el archivo: %s", path_query);
         free(path_query);
-        exit(1);
+        return QUERY_ERROR;
     }
 
     char* linea = NULL;
     size_t len = 0;
     int linea_actual = 0;
+    
+    t_estado_query estado_salida = QUERY_EXITO; 
 
-    // FETCH
-    while(getline(&linea, &len, file) != -1){
+    while (getline(&linea, &len, file) != -1) {
         // Eliminar \n manualmente SIN modificar el puntero
         size_t largo = strlen(linea);
         if (largo > 0 && linea[largo - 1] == '\n') {
-            linea[largo - 1] = '\0';
+        linea[largo - 1] = '\0';
         }
         // También eliminar \r si existe (archivos de Windows)
         largo = strlen(linea);
         if (largo > 0 && linea[largo - 1] == '\r') {
-            linea[largo - 1] = '\0';
+        linea[largo - 1] = '\0';
         }
 
-        // Solo ejecutamos si ya llegamos al PC_ACTUAL
         if (linea_actual >= PC_ACTUAL) {
 
             if (atomic_load(&query_error_flag)) {
-                log_debug(loggerWorker, "## Query %d abortada por error del Storage", query_actual ? query_actual->query_id : -1);
+                log_debug(loggerWorker, "## Query %d abortada por error externo", query_actual->query_id);
+                estado_salida = QUERY_ERROR;
                 break;
             }
-            if (atomic_load(&interrupt_flag)) {
-                log_info(loggerWorker, "## Query %d: Desalojo detectado en PC=%d", query_actual->query_id, PC_ACTUAL);
-                free(linea);
-                fclose(file);
-                guardar_paginas_modificadas();
-                notificar_master_desalojo(PC_ACTUAL);
-                atomic_store(&interrupt_flag, 0);
-                return;
-            }
 
-            log_info(loggerWorker, "## Query %d: FETCH - Program Counter: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
+            log_info(loggerWorker, "## Query %d: FETCH - PC: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
-            // Simula retardo de memoria
             usleep(configWorker->retardo_memoria * 1000);
 
             t_instruccion* inst = decode(linea);
             execute(inst);
             destruir_instruccion(inst);
-
+            
             PC_ACTUAL++;
+
+            if (atomic_load(&interrupt_flag)) {
+                log_warning(loggerWorker, "## Query %d: Interrupción detectada en PC: %d", query_actual->query_id, PC_ACTUAL);
+                estado_salida = QUERY_DESALOJADA;
+                break;
+            }
         }
         linea_actual++;
     }
 
     free(linea);
     fclose(file);
-}
+    free(path_query);
 
-void* hilo_escuchar_master(void* arg) {
-    while (1) {
-        int cod_op = recibir_operacion(conexionMaster);
-        if (cod_op <= 0) {
-            log_error(loggerWorker, "Master desconectado");
-            break;
-        }
-        
-        if (cod_op == DESALOJO) {
-            log_info(loggerWorker, "## DESALOJO recibido del Master");
-            atomic_store(&interrupt_flag, 1);
-        }
-        else {
-            log_warning(loggerWorker, "Operación inesperada en hilo_escuchar: %d", cod_op);
-        }
-    }
-    return NULL;
+    return estado_salida;
 }
 
 //convierto la instruccion cruda (osea la linea) en un enum

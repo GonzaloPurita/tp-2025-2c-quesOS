@@ -22,6 +22,12 @@ typedef enum {
     UNKNOWN
 } t_opcode;
 
+typedef enum {
+    QUERY_EXITO,
+    QUERY_DESALOJADA,
+    QUERY_ERROR
+} t_estado_query;
+
 typedef struct {
     t_opcode opcode;
     char** parametros;   // lista de parámetros como strings

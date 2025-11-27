@@ -64,4 +64,11 @@ bool archivoExiste(const char* path);
  */
 int pasarABloques(int bytes);
 
+/**
+ * @brief Imprime una lista de cadenas de caracteres.
+ * 
+ * @param lista Lista de cadenas de caracteres a imprimir. La lista debe estar terminada con un puntero NULL.
+ */
+void imprimirLista(char** lista);
+
 #endif
