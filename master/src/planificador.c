@@ -59,7 +59,7 @@ void planificarConDesalojoYAging() {
 
             actualizarMetricas(Q_READY, Q_EXEC, query);
             enviarQueryAWorkerEspecifico(query, workerLibre);
-        } else {
+        } else {SS
             log_error(loggerMaster, "No hay queries en EXEC ni Workers libres");
         }
         continue;

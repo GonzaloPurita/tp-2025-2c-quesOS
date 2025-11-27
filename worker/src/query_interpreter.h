@@ -56,7 +56,7 @@ typedef struct {
 extern t_query_context* query_actual;
 
 void recibir_queries();
-void ejercutar_query(char* path_query);
+t_estado_query ejecutar_query(char* path_query);
 t_instruccion* decode(char* instruccion_raw);
 t_opcode obtener_opcode(char* nombre);
 void execute(t_instruccion* inst);
@@ -67,7 +67,7 @@ void destruir_query_context(t_query_context* ctx);
 void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato);
 void manejar_respuesta_storage(op_code respuesta, char* operacion);
 void notificar_error_a_master(char* motivo);
-void* hilo_escuchar_master(void* arg);
+void* correr_query_en_hilo(void* arg);
 
 //ejecutar instrucciones
 void ejecutar_create(t_instruccion* inst);
