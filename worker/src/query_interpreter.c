@@ -17,8 +17,9 @@ void recibir_queries() {
         }
         log_info(loggerWorker, "Recibida operacion %d del Master", cod_op);
 
+        t_list* paquete = recibir_paquete(conexionMaster);
+
         if (cod_op == QCB) {
-            t_list* paquete = recibir_paquete(conexionMaster);
 
             if (!paquete || list_size(paquete) < 3) {
                 log_error(loggerWorker, "Error: Datos insuficientes en QCB.");
@@ -48,8 +49,6 @@ void recibir_queries() {
                 pthread_detach(hilo_cpu);
                 log_info(loggerWorker, "## Query %d: Hilo de CPU iniciado.", query_actual->query_id);
             }
-
-            list_destroy_and_destroy_elements(paquete, free);
         }
         else if (cod_op == DESALOJO) {
             log_warning(loggerWorker, "Master pidió desalojo (Hilo Principal)");
@@ -58,6 +57,7 @@ void recibir_queries() {
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
         }
+        list_destroy_and_destroy_elements(paquete, free);
     }
 }
 
@@ -92,6 +92,7 @@ void* correr_query_en_hilo(void* arg) {
 
     free(query_actual->nombre_query);
     free(query_actual);
+    query_actual = NULL;
     atomic_store(&interrupt_flag, 0); 
     
     return NULL;
@@ -420,7 +421,7 @@ void ejecutar_end(t_instruccion* inst){
     // manejar_respuesta_storage(rta, "END");
 
     // libero contexto
-    destruir_query_context(query_actual);
+    //destruir_query_context(query_actual);
 }
 
 
