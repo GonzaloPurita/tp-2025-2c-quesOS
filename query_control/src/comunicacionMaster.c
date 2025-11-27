@@ -17,13 +17,13 @@ void escucharMaster(int conexionMaster){
         switch(cod_op){
             case MENSAJE_LECTURA:
             // recibe <File:Tag> y <Contenido>
-                if (list_size(valores) < 2) {
+                if (list_size(valores) < 4) {
                     log_error(loggerQueryControl, "Paquete MENSAJE_LECTURA incompleto");
                     list_destroy_and_destroy_elements(valores, free);
                     break;
                 }
-                char* file_tag = list_get(valores, 0);
-                char* contenido = list_get(valores, 1);
+                char* file_tag = list_get(valores, 3);
+                char* contenido = list_get(valores, 2);
 
                 log_info(loggerQueryControl,"## Lectura realizada: Archivo %s, contenido: %s", file_tag, contenido);
                 break;

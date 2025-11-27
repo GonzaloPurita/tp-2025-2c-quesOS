@@ -23,8 +23,8 @@ extern t_log* loggerWorker;
 extern t_config_worker* configWorker;
 
 /* flags */
-extern atomic_int interrupt_flag;
-extern atomic_int query_error_flag;
+extern bool interrupt_flag;
+extern bool query_error_flag;
 
 /* otros externos ... */
 extern t_query_context* query_actual;

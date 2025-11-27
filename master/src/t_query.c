@@ -59,8 +59,6 @@ void actualizarMetricas(estado_query estadoActual, estado_query estadoNuevo, t_q
 }
 
 void agregarAReadyPorPrioridad(t_query* q){
-    pthread_mutex_lock(&mutex_cola_ready);
-
     int i = 0, n = list_size(cola_ready);
     while (i < n) {
         t_query* quer = list_get(cola_ready, i);
@@ -73,7 +71,6 @@ void agregarAReadyPorPrioridad(t_query* q){
         i++;
     }
     list_add_in_index(cola_ready, i, q); // agregamos con index para que ante prioridades iguales se respete el orden de llegada
-    pthread_mutex_unlock(&mutex_cola_ready);
 
     log_info(loggerMaster, "READY <- Q (p=%d, p_act=%d) en idx %d",
              q->prioridad, q->prioridad_actual, i);

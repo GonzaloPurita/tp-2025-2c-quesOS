@@ -37,6 +37,7 @@ void aplicar_aging_ready(void) {
     if (hubo_cambios) {
         //TODO: chequear que respete orden de llegada entre iguales y sino cambiar por list_add_index
         list_sort(cola_ready, cmp_query_por_prioridad);
+        sem_post(&hay_query_ready);
     }
 
     pthread_mutex_unlock(&mutex_cola_ready);

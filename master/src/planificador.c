@@ -110,6 +110,7 @@ void enviarQueryAWorker(t_query* query) {
 }
 
 void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWorker) {
+    log_debug(loggerMaster, "Enviando QID=%d a Worker %s (fd=%d)", query->QCB->QID, conexionWorker->id, conexionWorker->fd);
     conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
     enviarQCB(conexionWorker->fd, query->QCB, query->path); // 
     pthread_t hiloWORKER;
@@ -163,7 +164,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
         free(datos);
         return;
     }
-
+    log_debug(loggerMaster, "Desalojando en Worker %s (fd=%d)", datos->worker->id, datos->worker->fd);
     // 4) Lanzar hilo que hace el desalojo
     pthread_t hiloDesalojo;
     pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
@@ -182,14 +183,13 @@ void* desalojar(void* arg) {
 
    // 2) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
     sem_wait(&d->worker->semaforo);
-   
    // 3) Movemos las queries entre colas
 
     pthread_mutex_lock(&mutex_cola_exec);
     list_remove_element(cola_exec, d->candidatoDesalojo);
     list_add(cola_exec, d->nuevoQuery);
     pthread_mutex_unlock(&mutex_cola_exec);
-
+    
     pthread_mutex_lock(&mutex_cola_ready);
     list_remove_element(cola_ready, d->nuevoQuery);
     agregarAReadyPorPrioridad(d->candidatoDesalojo);
@@ -197,8 +197,9 @@ void* desalojar(void* arg) {
 
     actualizarMetricas(Q_EXEC, Q_READY, d->candidatoDesalojo);
     actualizarMetricas(Q_READY, Q_EXEC, d->nuevoQuery);
-
+    
     // 4) Mandamos la query nueva a ese worker
+    log_debug(loggerMaster, "Enviando nueva QID=%d al Worker %s (fd=%d) tras desalojo", d->nuevoQuery->QCB->QID, d->worker->id, d->worker->fd);
     enviarQueryAWorkerEspecifico(d->nuevoQuery, d->worker);
 
     free(d);

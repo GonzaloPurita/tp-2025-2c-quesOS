@@ -51,7 +51,7 @@ void* recibirConexiones(void* arg) {
 void* atenderCliente(void* arg) {
     int fd = *((int*) arg);
     free(arg);
-
+    
     op_code cod = recibir_operacion(fd);
     log_info(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
 

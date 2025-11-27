@@ -442,8 +442,6 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
         while (bloques[lenActual] != NULL) lenActual++;
     }
 
-    imprimirLista(bloques);
-
     int lenNuevo = (numeroBloqueLogico + 1 > lenActual) ? numeroBloqueLogico + 1 : lenActual;
 
     // Construir string del array actualizado
@@ -464,9 +462,6 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
         if (i < lenNuevo - 1) string_append(&bloquesActualizados, ",");
     }
     string_append(&bloquesActualizados, "]");
-    //log_info(loggerStorage, "Actualizando Metadata %s:%s -> BLOCKS=%s", file, tag, bloquesActualizados);
-
-    printf("Actualizando Metadata %s:%s -> BLOCKS=%s\n", file, tag, bloquesActualizados);
 
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     if(config_save(metadata) < 0) {

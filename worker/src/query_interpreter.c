@@ -3,11 +3,10 @@
 #include <commons/log.h> 
 
 t_query_context* query_actual;
+pthread_mutex_t mutex_error = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_interrupt = PTHREAD_MUTEX_INITIALIZER;
 
 void recibir_queries() {
-    atomic_store(&query_error_flag, 0);
-    atomic_store(&interrupt_flag, 0);
-
     while (1) {
         int cod_op = recibir_operacion(conexionMaster);
         
@@ -39,8 +38,12 @@ void recibir_queries() {
             query_actual->nombre_query = strdup(nombre_query);
             PC_ACTUAL = *pc_inicial;
 
-            atomic_store(&interrupt_flag, 0);
-            atomic_store(&query_error_flag, 0);
+            pthread_mutex_lock(&mutex_error);
+            query_error_flag = false;
+            pthread_mutex_unlock(&mutex_error);
+            pthread_mutex_lock(&mutex_interrupt);
+            interrupt_flag = false;
+            pthread_mutex_unlock(&mutex_interrupt);
 
             pthread_t hilo_cpu;
             if (pthread_create(&hilo_cpu, NULL, (void*)correr_query_en_hilo, NULL) != 0) {
@@ -51,8 +54,10 @@ void recibir_queries() {
             }
         }
         else if (cod_op == DESALOJO) {
+            pthread_mutex_lock(&mutex_interrupt);
+            interrupt_flag = true;
+            pthread_mutex_unlock(&mutex_interrupt);
             log_warning(loggerWorker, "Master pidió desalojo (Hilo Principal)");
-            atomic_store(&interrupt_flag, 1);
         }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
@@ -93,7 +98,9 @@ void* correr_query_en_hilo(void* arg) {
     free(query_actual->nombre_query);
     free(query_actual);
     query_actual = NULL;
-    atomic_store(&interrupt_flag, 0); 
+    pthread_mutex_lock(&mutex_interrupt);
+    interrupt_flag = false;
+    pthread_mutex_unlock(&mutex_interrupt); 
     
     return NULL;
 }
@@ -125,8 +132,10 @@ t_estado_query ejecutar_query(char* path_query) {
         }
 
         if (linea_actual >= PC_ACTUAL) {
-
-            if (atomic_load(&query_error_flag)) {
+            pthread_mutex_lock(&mutex_error);
+            bool error_flag = query_error_flag;
+            pthread_mutex_unlock(&mutex_error);
+            if (error_flag) {
                 log_debug(loggerWorker, "## Query %d abortada por error externo", query_actual->query_id);
                 estado_salida = QUERY_ERROR;
                 break;
@@ -144,7 +153,10 @@ t_estado_query ejecutar_query(char* path_query) {
             
             PC_ACTUAL++;
 
-            if (atomic_load(&interrupt_flag)) {
+            pthread_mutex_lock(&mutex_interrupt);
+            bool interrupt = interrupt_flag;
+            pthread_mutex_unlock(&mutex_interrupt);
+            if (interrupt) {
                 log_warning(loggerWorker, "## Query %d: Interrupción detectada en PC: %d", query_actual->query_id, PC_ACTUAL);
                 estado_salida = QUERY_DESALOJADA;
                 break;
@@ -457,6 +469,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
     agregar_a_paquete(respuesta, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(respuesta, &tamanio, sizeof(int));
     agregar_a_paquete(respuesta, contenido, tamanio);
+    agregar_a_paquete(respuesta, formato->tag, strlen(formato->tag) + 1);
 
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);
@@ -672,7 +685,9 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
     if (query_actual) notificar_error_a_master((char*)motivo_error);
 
     // marco error global para frenar ejecución
-    atomic_store(&query_error_flag, 1);
+    pthread_mutex_lock(&mutex_error);
+    query_error_flag = true;
+    pthread_mutex_unlock(&mutex_error);
 
     // liberar contexto y marcar error
     if (query_actual) {
