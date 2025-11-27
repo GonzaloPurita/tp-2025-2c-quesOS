@@ -78,3 +78,16 @@ int pasarABloques(int bytes) {
         return bytes/superblock->blocksize + 1;
     }
 }
+
+void imprimirLista(char** lista) {
+    if (lista != NULL) {
+        printf("CONTENIDO: [");
+        for (int i = 0; lista[i] != NULL; i++) {
+            printf("%s", lista[i]);
+            if (lista[i + 1] != NULL) printf(", ");
+        }
+        printf("]\n");
+    } else {
+        printf("La lista es NULL\n");
+    }
+}

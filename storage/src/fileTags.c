@@ -160,6 +160,7 @@ bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLo
     free(rutaBloqueLogico);
 
     // Actualizo metadata BLOCKS en el índice correspondiente
+    log_debug(loggerStorage, "Actualizando metadata BLOCKS para %s:%s[%d] -> %d", nombreFile, nombreTag, numeroBloqueLogico, numeroBloqueFisico);
     if (!setBloqueEnMetadata(nombreFile, nombreTag, numeroBloqueLogico, numeroBloqueFisico)) {
         log_warning(loggerStorage, "No se pudo actualizar metadata BLOCKS para %s:%s[%d]", nombreFile, nombreTag, numeroBloqueLogico);
     }
@@ -379,21 +380,50 @@ op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueL
     }
 
     char* contenido = leerBloqueFisico(bloqueFisico);
+    if (contenido == NULL) {
+        log_error(loggerStorage, "Error leyendo contenido del bloque físico %d", bloqueFisico);
+        return OP_FAILED;
+    }
+
     char* hash = crypto_md5(contenido, superblock->blocksize);
     free(contenido);
 
     if(config_has_property(hashMap, hash)) {
         char* bloqueConEseHash = config_get_string_value(hashMap, hash);
         int nroBloqueConEseHash = obtenerNumeroBloqueFisico(bloqueConEseHash);
-        eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico);
-        agregarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, nroBloqueConEseHash);
-        free(hash);
-        return OP_SUCCESS;
+        
+        // Verificar que no sea el mismo bloque físico (evitar reemplazo innecesario)
+        if (nroBloqueConEseHash == bloqueFisico) {
+            log_debug(loggerStorage, "El bloque físico %d ya está en el hashMap, no se reemplaza", bloqueFisico);
+            free(hash);
+            return OP_SUCCESS;
+        }
+
+        log_info(loggerStorage, "Hash duplicado encontrado: bloque %d -> bloque %d (hash: %s)", bloqueFisico, nroBloqueConEseHash, hash);
+        
+        // Eliminar el hardlink antiguo (esto puede liberar el bloque si es único)
+        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico)) {
+            log_error(loggerStorage, "Error eliminando hardlink del bloque %d", bloqueFisico);
+            free(hash);
+            return OP_FAILED;
+        }
+        
+        // Agregar hardlink al bloque con el mismo hash
+        if (!agregarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, nroBloqueConEseHash)) {
+            log_error(loggerStorage, "Error agregando hardlink al bloque %d", nroBloqueConEseHash);
+            free(hash);
+            return OP_FAILED;
+        }
     } else {
-        config_set_value(hashMap, hash, crearNombreBloque(bloqueFisico));
+        // El hash no existe, agregarlo al hashMap
+        char* nombreBloque = crearNombreBloque(bloqueFisico);
+        config_set_value(hashMap, hash, nombreBloque);
         config_save(hashMap);
-        free(hash);
+        log_debug(loggerStorage, "Nuevo hash agregado al hashMap: %s -> %s", hash, nombreBloque);
+        free(nombreBloque);
     }
+    
+    free(hash);
     return OP_SUCCESS;
 }
 
@@ -411,6 +441,8 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
     if (bloques != NULL) {
         while (bloques[lenActual] != NULL) lenActual++;
     }
+
+    imprimirLista(bloques);
 
     int lenNuevo = (numeroBloqueLogico + 1 > lenActual) ? numeroBloqueLogico + 1 : lenActual;
 
@@ -434,8 +466,12 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
     string_append(&bloquesActualizados, "]");
     //log_info(loggerStorage, "Actualizando Metadata %s:%s -> BLOCKS=%s", file, tag, bloquesActualizados);
 
+    printf("Actualizando Metadata %s:%s -> BLOCKS=%s\n", file, tag, bloquesActualizados);
+
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
-    config_save(metadata);
+    if(config_save(metadata) < 0) {
+        log_error(loggerStorage, "Error guardando metadata para %s:%s", file, tag);
+    }
 
     // Liberaciones
     if (bloques != NULL) {

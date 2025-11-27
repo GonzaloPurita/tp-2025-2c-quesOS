@@ -2,10 +2,10 @@
 
 // Privados
 void enviarRespuesta(op_code codigo, int socket_cliente);
-void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int socket_cliente);
-void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int socket_cliente);
+void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int bytes, int socket_cliente);
+void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int bytes, int socket_cliente);
 int contarElementos(char** array);
-void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos);
+void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int bytes, int* bloquesFisicos);
 op_code borrarTag(char* nombreFile, char* nombreTag);
 op_code commitTag(char* nombreFile, char* nombreTag);
 op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido);
@@ -50,10 +50,10 @@ void truncar(t_list* data, int socket_cliente) {
         logearResultadoOP(OP_SUCCESS, "TRUNCAR");
     }
     else if(bloquesActuales < nuevoTamanio){
-        agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, socket_cliente);
+        agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, bytes, socket_cliente);
     }
     else{
-        reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, blocks, socket_cliente);   
+        reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, blocks, bytes, socket_cliente);   
     }
     string_array_destroy(blocks);
     config_destroy(metadata);
@@ -147,7 +147,7 @@ void enviarRespuesta(op_code codigo, int socket_cliente) {
     eliminar_paquete(paqueteRespuesta);
 }
 
-void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int socket_cliente) {
+void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int bytes, int socket_cliente) {
     int i = bloquesActuales;
     bool error = false;
 
@@ -174,13 +174,13 @@ void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bl
         for (int k = 0; k < bloquesActuales; k++) {
             bloquesFisicos[k] = atoi(blocks[k]);
         }
-        actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bloquesFisicos);
+        actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bytes, bloquesFisicos);
         free(bloquesFisicos);
         enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
 }
 
-void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int socket_cliente) {
+void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int bytes, int socket_cliente) {
     int i;
     bool error = false;
 
@@ -204,7 +204,7 @@ void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int 
         for (int k = 0; k < nuevoTamanio; k++) {
             bloquesFisicos[k] = atoi(blocks[k]);
         }
-        actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bloquesFisicos);
+        actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bytes, bloquesFisicos);
         free(bloquesFisicos);
         enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
@@ -218,7 +218,7 @@ int contarElementos(char** array) {
     return count;
 }
 
-void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int* bloquesFisicos) {
+void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int bytes, int* bloquesFisicos) {
     // Crear un string para almacenar la lista de bloques
     char* bloquesActualizados = string_new();
     string_append(&bloquesActualizados, "[");
@@ -241,12 +241,14 @@ void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio
     }
 
     string_append(&bloquesActualizados, "]");
+    char* bytesStr = string_itoa(bytes);
     char* tamanio = string_itoa(nuevoTamanio);
-    config_set_value(metadata, "TAMAÑO", tamanio);
+    config_set_value(metadata, "TAMAÑO", bytesStr);
     config_set_value(metadata, "BLOCKS", bloquesActualizados);
     config_save(metadata);
     free(bloquesActualizados);
     free(tamanio);
+    free(bytesStr);
 }
 
 op_code borrarTag(char* nombreFile, char* nombreTag) {
@@ -278,19 +280,19 @@ op_code commitTag(char* nombreFile, char* nombreTag) {
     if (metadata == NULL) {
         return ERROR_FILE_NOT_FOUND;
     }
-
+    
     char** blocks = config_get_array_value(metadata, "BLOCKS");
+    config_destroy(metadata);
     int bloquesActuales = contarElementos(blocks);
 
     for (int i = 0; i < bloquesActuales; i++) {
         op_code resultado = validarBloqueLogico(nombreFile, nombreTag, i);
         if (resultado != OP_SUCCESS) {
-            string_array_destroy(blocks);
-            config_destroy(metadata);
             return resultado;
         }
     }
-
+    
+    metadata = getMetaData(nombreFile, nombreTag);
     config_set_value(metadata, "ESTADO", "COMMITED");
     config_save(metadata);
     config_destroy(metadata);
