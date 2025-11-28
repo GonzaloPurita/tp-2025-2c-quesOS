@@ -195,6 +195,7 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
     // paquete para Storage (enviamos nro_pagina)
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
     agregar_a_paquete(paquete, &nro_bloque, sizeof(int));

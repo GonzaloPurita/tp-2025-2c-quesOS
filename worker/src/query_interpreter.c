@@ -288,6 +288,7 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_CREATE;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
     enviar_paquete(paquete, conexionStorage);
@@ -313,6 +314,7 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_TRUNCATE;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
     agregar_a_paquete(paquete, &tamanio, sizeof(int));
@@ -340,6 +342,7 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
 
     t_paquete* paquete = crear_paquete(); 
     paquete->codigo_operacion = OP_TAG;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato_origen->file_name, strlen(formato_origen->file_name) + 1);
     agregar_a_paquete(paquete, formato_origen->tag, strlen(formato_origen->tag) + 1);
     agregar_a_paquete(paquete, formato_destino->file_name, strlen(formato_destino->file_name) + 1);
@@ -365,6 +368,7 @@ void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_DELETE;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
 
@@ -401,6 +405,7 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     //notifico al storage que se realizo el commit 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_COMMIT;
+    agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
 
@@ -567,6 +572,7 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
             t_paquete* paquete = crear_paquete();
             paquete->codigo_operacion = OP_WRITE;
             // Orden esperado por Storage: [File, Tag, NroBloque, Contenido, Tamaño]
+            agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
             agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
             agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
             agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
