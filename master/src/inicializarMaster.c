@@ -207,6 +207,7 @@ void* monitorear_query_control(void* arg) {
     // Loop que solo detecta desconexión
     while (1) {
         int cod_op = recibir_operacion(fd);
+        t_list* data = recibir_paquete(fd);
         
         if (cod_op <= 0) {
             // Query Control se desconectó
@@ -216,6 +217,7 @@ void* monitorear_query_control(void* arg) {
             break;
         }
         // Cualquier otra cosa que se reciba ya se haga con el QC (tipo mandarle lecturas) se hace en otro hilo
+        list_destroy_and_destroy_elements(data, free);
     }
     
     free(conexion);
