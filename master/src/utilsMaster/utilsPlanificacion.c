@@ -25,12 +25,12 @@ void aplicar_aging_ready(void) {
         t_query* q = list_get(cola_ready, i);
 
         // Envejecer solo si todavía no se aplicó en este tick
-        if (q->prioridad_actual > 0 && q->IDAging < AGING_TICK_GLOBAL) {
+        if (q->IDAging < AGING_TICK_GLOBAL) {
             int anterior = q->prioridad_actual;
             q->prioridad_actual = anterior - 1; // 0 es mejor
             q->IDAging = AGING_TICK_GLOBAL;
             hubo_cambios = 1;
-            log_info(loggerMaster, "AGING QID=%d: %d -> %d", q->QCB->QID, anterior, q->prioridad_actual);
+            log_info(loggerMaster, "Cambio de prioridad de Query: “##<%d> Cambio de prioridad: <%d> - <%d>", q->QCB->QID, anterior, q->prioridad_actual);
         }
     }
 

@@ -109,9 +109,7 @@ void* atenderCliente(void* arg) {
             agregar_a_paquete(r, &ok, sizeof(int));
             enviar_paquete(r, fd);
             eliminar_paquete(r);
-        
-            log_info(loggerMaster, "Worker %s conectado (fd=%d)", worker_id, fd);
-            log_info(loggerMaster, "Workers conectados=%d, disponibles=%d", workers_conectados(), workers_disponibles());
+            log_info(loggerMaster, "## Se conecta el Worker <%s> - Cantidad total de Workers: <%d>", worker_id, workers_conectados());
         
             worker_marcar_libre_por_fd(fd);
             sem_post(&sem_workers_disponibles);
@@ -138,7 +136,6 @@ void* atenderCliente(void* arg) {
 
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
-
             // Genero QID
             int qid = 0;
             pthread_mutex_lock(&mutex_qid);
@@ -169,7 +166,12 @@ void* atenderCliente(void* arg) {
             }
             
 
-            log_info(loggerMaster, "QID=%d recibida (prio=%d, path=%s)", qid, q->prioridad /* o q->prioridad_actual */, q->path);
+            log_info(loggerMaster, "## Se conecta un Query Control para ejecutar la Query %s " "con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", 
+            q->path,
+            q->prioridad_actual,   // o q->prioridad, según cuál manejes como “inicial”
+            qid,
+            workers_conectados()   // o el valor real de “nivel de multiprocesamiento”
+            );
 
             // ACK al Query_Control con el QID asignado
             t_paquete* r = crear_paquete();
