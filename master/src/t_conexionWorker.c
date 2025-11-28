@@ -63,9 +63,7 @@ int worker_registrar(char* id, int fd) {
     int list_size_now = list_size(LISTA_WORKERS);
     pthread_mutex_unlock(&mutex_workers);
 
-    if (loggerMaster) log_info(loggerMaster, "Worker %s registrado (fd=%d). Lista size=%d", id_copy, fd, list_size_now);
-
-    return 1;
+    return list_size_now;
 }
 
 void worker_marcar_libre_por_fd(int fd) {
@@ -126,7 +124,6 @@ bool exec_buscar_por_qid(int qid, int* out_fd_qc) {
 }
 
 void worker_desconectar_por_fd(int fd) {
-    // Buscar el worker por fd 
     pthread_mutex_lock(&mutex_workers);
     t_conexionWorker* w = NULL;
     for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
@@ -137,45 +134,58 @@ void worker_desconectar_por_fd(int fd) {
 
     if (!w) return;
 
-    log_info(loggerMaster, "Se detectó desconexión del Worker %s (fd=%d)", w->id, fd);
-
+    int qid_en_ejecucion = w->qid_actual;  
     w->conectado = false;
     close(fd);
 
-    // Si tenía una query en ejecución, la finalizo con error y le mando al QC
-    if (w->qid_actual != -1) {
-        int qid = w->qid_actual;   // cachear por seguridad
+    int total_workers = workers_conectados();
 
+    if (qid_en_ejecucion != -1) {
+        // sacar la query de EXEC
         pthread_mutex_lock(&mutex_cola_exec);
+        t_query* q = NULL;
         for (int i = 0; i < list_size(cola_exec); i++) {
-            t_query* q = list_get(cola_exec, i);
-            if (q->QCB->QID == qid) {
+            t_query* it = list_get(cola_exec, i);
+            if (it->QCB->QID == qid_en_ejecucion) {
+                q = it;
                 list_remove(cola_exec, i);
-                pthread_mutex_unlock(&mutex_cola_exec);
-
-                log_warning(loggerMaster,
-                    "Finalizando Query %d con error por desconexión del Worker %s",
-                    q->QCB->QID, w->id);
-
-                // Notificar al QC solo con qid
-                t_paquete* paquete = crear_paquete();
-                paquete->codigo_operacion = QUERY_FINALIZADA; 
-                agregar_a_paquete(paquete, &qid, sizeof(int));
-                eliminar_paquete(paquete);
-
-                actualizarMetricas(Q_EXEC, Q_EXIT, q);
-
-                pthread_mutex_lock(&mutex_cola_exit);
-                list_add(cola_exit, q);
-                pthread_mutex_unlock(&mutex_cola_exit);
-
-                // ya no tiene nada en ejecución
-                w->qid_actual = -1;
-                return;
+                break;
             }
         }
         pthread_mutex_unlock(&mutex_cola_exec);
+
+        if (q) {
+            // log completo EXACTO como lo querés
+            log_info(loggerMaster,
+                "## Se desconecta el Worker %s - Se finaliza la Query %d - Cantidad total de Workers: %d",
+                w->id,
+                qid_en_ejecucion,
+                total_workers
+            );
+
+            // notificar al Query Control
+            t_paquete* paquete = crear_paquete();
+            paquete->codigo_operacion = QUERY_FINALIZADA;
+            agregar_a_paquete(paquete, &qid_en_ejecucion, sizeof(int));
+            enviar_paquete(paquete, q->fd_qc);
+            eliminar_paquete(paquete);
+
+            actualizarMetricas(Q_EXEC, Q_EXIT, q);
+
+            pthread_mutex_lock(&mutex_cola_exit);
+            list_add(cola_exit, q);
+            pthread_mutex_unlock(&mutex_cola_exit);
+        }
+    } else {
+        // Worker no tenía query en ejecución
+        log_info(loggerMaster,
+            "## Se desconecta el Worker %s - No tenía query asignada - Cantidad total de Workers: %d",
+            w->id,
+            total_workers
+        );
     }
+
+    w->qid_actual = -1;
 }
 
 t_conexionWorker* worker_por_fd(int fd) {
@@ -197,14 +207,12 @@ void* atenderWorker(void* arg){
   while (1) {
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
-        log_warning(loggerMaster, "Worker %s: desconectado", id);
         worker_desconectar_por_fd(fd);
         break;
       }  
         
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
-            log_info(loggerMaster, "LLEGO UN RTA_DESALOJO DEL WORKER");
             t_list* p = recibir_paquete(fd);
             if (!p || list_size(p) < 2) {
                 log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
@@ -229,14 +237,67 @@ void* atenderWorker(void* arg){
             pthread_mutex_unlock(&mutex_cola_exec);
 
             if (!actualizado) {
-                // Si no está en READY puede ser carrera rara: log y seguimos 
-                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY para actualizar PC=%d", qid, pc);
+                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY (posible desconexión de QC)", qid);
+                
+                break;  
             } else {
                 log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
             }
 
             // 2) Despertar al hilo desalojar() para que envíe la nueva query
             sem_post(&conexionWorker->semaforo);
+            return NULL;
+        }
+        case OP_END: {
+            // 1) Recibir el paquete del Worker
+            t_list* p = recibir_paquete(fd);
+            if (list_size(p) < 1) {
+                log_error(loggerMaster, "Worker %s: OP_END mal formado", id);
+                list_destroy_and_destroy_elements(p, free);
+                break;
+            }
+            
+            int qid = *(int*) list_get(p, 0);
+            list_destroy_and_destroy_elements(p, free);
+
+            // 2) Buscar y sacar de EXEC -> EXIT
+            pthread_mutex_lock(&mutex_cola_exec);
+            t_query* q = NULL;
+            for (int i = 0; i < list_size(cola_exec); i++) {
+                t_query* it = list_get(cola_exec, i);
+                if (it->QCB->QID == qid) {
+                    q = it;
+                    list_remove(cola_exec, i);
+                    break;
+                }
+            }
+            pthread_mutex_unlock(&mutex_cola_exec);
+
+            if (!q) {
+                log_warning(loggerMaster, "OP_END: QID=%d no estaba en EXEC", qid);
+                break;
+            }
+
+            // 3) Guardar fd_qc antes de pasar la query a exit
+            int fd_qc = q->fd_qc;
+
+            // 4) Movemos la query a exit
+            actualizarMetricas(Q_EXEC, Q_EXIT, q);
+            pthread_mutex_lock(&mutex_cola_exit);
+            list_add(cola_exit, q);
+            pthread_mutex_unlock(&mutex_cola_exit);
+
+            // 5) Marcamos el Worker como libre
+            worker_marcar_libre_por_fd(fd);
+            sem_post(&sem_workers_disponibles);
+
+            // 6) Enviar respuesta al Query Control
+            t_paquete* r = crear_paquete();
+            r->codigo_operacion = QUERY_FINALIZADA;
+            agregar_a_paquete(r, &qid, sizeof(int));
+            enviar_paquete(r, fd_qc);
+            eliminar_paquete(r);
+            log_info(loggerMaster, "## Se terminó la Query <%d> en el Worker <%s>", qid, id);
             return NULL;
         }
         case OP_READ: {
@@ -281,6 +342,7 @@ void* atenderWorker(void* arg){
             agregar_a_paquete(out, tag,  strlen(tag) + 1);
 
             enviar_paquete(out, fd_qc);
+            log_info(loggerMaster,"## Se envía un mensaje de lectura de la Query <%d> en el worker <%s> al Query Control", qid, id);
             eliminar_paquete(out);
 
             free(buf);

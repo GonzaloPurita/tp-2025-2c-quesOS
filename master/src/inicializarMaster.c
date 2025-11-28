@@ -15,8 +15,8 @@ void iniciarConexionesMaster() {
     workers_iniciar();
     planificador_lanzar();
 
-    log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
-    log_info(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);
+    log_debug(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
+    log_debug(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);
 
     pthread_t hilo_conexiones;
     int result = pthread_create(&hilo_conexiones, NULL, recibirConexiones, NULL);
@@ -34,11 +34,11 @@ void cerrarConexionesMaster() {
 
 void* recibirConexiones(void* arg) {
     while (1) {
-        log_info(loggerMaster, "Esperando nuevas conexiones...");
+        log_debug(loggerMaster, "Esperando nuevas conexiones...");
         int cliente_fd = esperarCliente(server_fd_master);
         int* fd_ptr = malloc(sizeof(int));
         *fd_ptr = cliente_fd;
-        log_info(loggerMaster, "Nueva conexión entrante en fd=%d", cliente_fd);
+        log_debug(loggerMaster, "Nueva conexión entrante en fd=%d", cliente_fd);
 
         pthread_t hilo;
         pthread_create(&hilo, NULL, (void*) atenderCliente, fd_ptr);
@@ -53,7 +53,7 @@ void* atenderCliente(void* arg) {
     free(arg);
     
     op_code cod = recibir_operacion(fd);
-    log_info(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
+    log_debug(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
 
     switch (cod) {
         case ID_WORKER: {
@@ -84,7 +84,6 @@ void* atenderCliente(void* arg) {
         
             list_destroy_and_destroy_elements(datos, free);
         
-            log_info(loggerMaster, "Worker ID=%s conectado en fd=%d", worker_id, fd);
         
             if (!worker_registrar(worker_id, fd)) {
                 log_error(loggerMaster, "No se pudo registrar worker %s en fd=%d", worker_id, fd);
@@ -109,9 +108,7 @@ void* atenderCliente(void* arg) {
             agregar_a_paquete(r, &ok, sizeof(int));
             enviar_paquete(r, fd);
             eliminar_paquete(r);
-        
-            log_info(loggerMaster, "Worker %s conectado (fd=%d)", worker_id, fd);
-            log_info(loggerMaster, "Workers conectados=%d, disponibles=%d", workers_conectados(), workers_disponibles());
+            log_info(loggerMaster, "## Se conecta el Worker <%s> - Cantidad total de Workers: <%d>", worker_id, workers_conectados());
         
             worker_marcar_libre_por_fd(fd);
             sem_post(&sem_workers_disponibles);
@@ -138,7 +135,6 @@ void* atenderCliente(void* arg) {
 
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
-
             // Genero QID
             int qid = 0;
             pthread_mutex_lock(&mutex_qid);
@@ -169,7 +165,12 @@ void* atenderCliente(void* arg) {
             }
             
 
-            log_info(loggerMaster, "QID=%d recibida (prio=%d, path=%s)", qid, q->prioridad /* o q->prioridad_actual */, q->path);
+            log_info(loggerMaster, "## Se conecta un Query Control para ejecutar la Query %s " "con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", 
+            q->path,
+            q->prioridad_actual,   // o q->prioridad, según cuál manejes como “inicial”
+            qid,
+            workers_conectados()   // o el valor real de “nivel de multiprocesamiento”
+            );
 
             // ACK al Query_Control con el QID asignado
             t_paquete* r = crear_paquete();
@@ -178,6 +179,13 @@ void* atenderCliente(void* arg) {
             enviar_paquete(r, fd);
             eliminar_paquete(r);
 
+            t_conexion_qc* conexion = malloc(sizeof(t_conexion_qc));
+            conexion->fd = fd;
+            conexion->qid = qid;
+            
+            pthread_t hilo_monitor_qc;
+            pthread_create(&hilo_monitor_qc, NULL, monitorear_query_control, (void*) conexion);
+            pthread_detach(hilo_monitor_qc);
             // NO cerrar fd. Queda asociado a esta query para reenviar las operaciones de worker
             return NULL;
         }
@@ -188,4 +196,109 @@ void* atenderCliente(void* arg) {
             break;
     }
     return NULL;
+}
+
+
+void* monitorear_query_control(void* arg) {
+    t_conexion_qc* conexion = (t_conexion_qc*) arg;
+    int fd = conexion->fd;
+    int qid = conexion->qid;
+    
+    // Loop que solo detecta desconexión
+    while (1) {
+        int cod_op = recibir_operacion(fd);
+        
+        if (cod_op <= 0) {
+            // Query Control se desconectó
+            log_warning(loggerMaster, "## Se desconecta un Query Control. Se finaliza la Query %d. Motivo: DESCONEXION", qid);
+            
+            query_control_desconectado(qid);
+            break;
+        }
+        // Cualquier otra cosa que se reciba ya se haga con el QC (tipo mandarle lecturas) se hace en otro hilo
+    }
+    
+    free(conexion);
+    return NULL;
+}
+
+void query_control_desconectado(int qid) {
+    // Buscar la query en las colas
+    t_query* query = NULL;
+    estado_query estado_actual;
+    
+    // 1) Buscar en READY
+    pthread_mutex_lock(&mutex_cola_ready);
+    for (int i = 0; i < list_size(cola_ready); i++) {
+        t_query* q = list_get(cola_ready, i);
+        if (q->QCB->QID == qid) {
+            query = q;
+            list_remove(cola_ready, i);
+            estado_actual = Q_READY;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cola_ready);
+    
+    // 2) Si no está en READY, buscar en EXEC
+    if (!query) {
+        pthread_mutex_lock(&mutex_cola_exec);
+        for (int i = 0; i < list_size(cola_exec); i++) {
+            t_query* q = list_get(cola_exec, i);
+            if (q->QCB->QID == qid) {
+                query = q;
+                list_remove(cola_exec, i);
+                estado_actual = Q_EXEC;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&mutex_cola_exec);
+    }
+    
+    // 3) Si no se encontró, ya terminó o está en EXIT
+    if (!query) {
+        log_debug(loggerMaster, "Query %d ya finalizó o no existe", qid);
+        return;
+    }
+    
+    // 4) Logueo la desconexión
+    log_info(loggerMaster, "## Se desconecta un Query Control. Se finaliza la Query %d con prioridad %d. Nivel multiprocesamiento %d",
+             qid, query->prioridad_actual, workers_conectados());
+    
+    // 5) Si estaba en EXEC, desalojar del Worker
+    if (estado_actual == Q_EXEC) {
+        t_conexionWorker* worker = encontrarWorkerPorQid(qid);
+        if (worker) {
+            log_info(loggerMaster, "## Se desaloja la Query <%d> (<%d>) del Worker <%s> - Motivo: DESCONEXION",
+                     qid, query->prioridad_actual, worker->id);
+            
+            // Enviar DESALOJO al Worker
+            t_paquete* p = crear_paquete();
+            p->codigo_operacion = DESALOJO;
+            agregar_a_paquete(p, &qid, sizeof(int));
+            enviar_paquete(p, worker->fd);
+            eliminar_paquete(p);
+            
+            // Marcar worker como libre (no esperar RTA_DESALOJO en este caso)
+            worker_marcar_libre_por_fd(worker->fd);
+
+            if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
+                sem_post(&sem_workers_disponibles);
+            } else{
+                sem_post(&hay_query_ready);
+            }
+            
+        }
+    }
+    
+    // 6) Mover la query a EXIT
+    actualizarMetricas(estado_actual, Q_EXIT, query);
+    pthread_mutex_lock(&mutex_cola_exit);
+    list_add(cola_exit, query);
+    pthread_mutex_unlock(&mutex_cola_exit);
+    
+    // 7) Si había una query esperando, planificar
+    if (estado_actual == Q_EXEC) {
+        // El worker quedó libre, el planificador lo usará automáticamente
+    }
 }

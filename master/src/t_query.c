@@ -72,8 +72,7 @@ void agregarAReadyPorPrioridad(t_query* q){
     }
     list_add_in_index(cola_ready, i, q); // agregamos con index para que ante prioridades iguales se respete el orden de llegada
 
-    log_info(loggerMaster, "READY <- Q (p=%d, p_act=%d) en idx %d",
-             q->prioridad, q->prioridad_actual, i);
+    log_debug(loggerMaster, "READY <- Q (p=%d, p_act=%d) en idx %d", q->prioridad, q->prioridad_actual, i);
 
     sem_post(&hay_query_ready); // despertar planificador
 }

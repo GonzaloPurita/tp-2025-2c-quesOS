@@ -15,7 +15,7 @@ void planificador_lanzar(void) {
     pthread_t th_planificador;
     pthread_create(&th_planificador, NULL, planificador, NULL);
     pthread_detach(th_planificador);
-    log_info(loggerMaster, "Hilo planificador iniciado");
+    log_debug(loggerMaster, "Hilo planificador iniciado");
 }
 
 void planificarConDesalojoYAging() {
@@ -103,15 +103,16 @@ void planificarSinDesalojo() {
 void enviarQueryAWorker(t_query* query) {
     t_conexionWorker* conexionWorker = obtenerWorkerLibre(); // Obtengo un worker libre
     conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
-    enviarQCB(conexionWorker->fd, query->QCB, query->path); // 
+    log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", query->QCB->QID, query->prioridad_actual, conexionWorker->id); 
+    enviarQCB(conexionWorker->fd, query->QCB, query->path); //
     pthread_t hiloWORKER;
     pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) conexionWorker); 
     pthread_detach(hiloWORKER);
 }
 
 void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWorker) {
-    log_debug(loggerMaster, "Enviando QID=%d a Worker %s (fd=%d)", query->QCB->QID, conexionWorker->id, conexionWorker->fd);
     conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
+    log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", query->QCB->QID, query->prioridad_actual, conexionWorker->id);
     enviarQCB(conexionWorker->fd, query->QCB, query->path); // 
     pthread_t hiloWORKER;
     pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) conexionWorker); 
@@ -164,7 +165,11 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
         free(datos);
         return;
     }
-    log_debug(loggerMaster, "Desalojando en Worker %s (fd=%d)", datos->worker->id, datos->worker->fd);
+    log_info(loggerMaster, "## Se desaloja la Query %d (p=%d) del Worker %s (fd=%d) - Motivo: PRIORIDAD",
+    candidatoDesalojo->QCB->QID,
+    candidatoDesalojo->prioridad_actual,
+    datos->worker->id,
+    datos->worker->fd);
     // 4) Lanzar hilo que hace el desalojo
     pthread_t hiloDesalojo;
     pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);

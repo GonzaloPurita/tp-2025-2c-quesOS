@@ -13,4 +13,12 @@ void cerrarConexionesMaster(void);
 void* recibirConexiones(void* arg);
 void* atenderCliente(void* arg);
 
+void* monitorear_query_control(void* arg) ;
+void query_control_desconectado(int qid);
+
+typedef struct {
+    int fd;
+    int qid;
+} t_conexion_qc;
+
 #endif /* INICIALIZAR_MASTER_H_*/
