@@ -73,7 +73,7 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         offset = 0; // a partir de la segunda página empieza desde 0, porque antes tal vez arrancaba con la primer pagina empezada, pero ya la segunda si o si arranc de cero
     }
 
-    return buffer;
+    return buffer;  
 }
 
 void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
@@ -88,7 +88,7 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
     free(clave_tabla);
 
-    for (int p = pagina_inicio; p <= pagina_fin; p++) {
+    for (int p = pagina_inicio; p < pagina_fin; p++) { // podria ser <= ?
         char* clave_pag  = string_itoa(p);
         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
         free(clave_pag);
@@ -98,7 +98,13 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
 
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
 
-        memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar); // estoy guardando la posicion en donde se queda el string valor porque ese string puede quedar repartido en varias paginas
+        //memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar); // estoy guardando la posicion en donde se queda el string valor porque ese string puede quedar repartido en varias paginas
+
+        if (offset == direccion_base % TAM_PAGINA) {
+            // solo limpiar la primera vez que se escribe sobre esta página
+            memset(MEMORIA + frame * TAM_PAGINA, 0, TAM_PAGINA);
+        }
+        memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
 
         entrada->modificado = true; // marco como la entrada como modificada
         frames[frame].modificado = true; // marco el frame como modificado
@@ -237,7 +243,9 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
         int offset_en_bloque = (nro_pagina % paginasXbloque) * TAM_PAGINA;
 
         // Copiar contenido a memoria interna
-        memcpy(MEMORIA + marco * TAM_PAGINA, contenido + offset_en_bloque, TAM_PAGINA);
+        void* destino = MEMORIA + marco * TAM_PAGINA;
+        memset(destino, 0, TAM_PAGINA);
+        memcpy(destino, contenido + offset_en_bloque, TAM_PAGINA);
 
         frames[marco].ocupado = true;
         frames[marco].modificado = false;
@@ -256,9 +264,9 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
 
         entrada_pag* entrada = malloc(sizeof(entrada_pag));
         entrada->indice_frame = marco;
-        entrada->presente     = true;
-        entrada->modificado   = false;
-        entrada->uso          = true;
+        entrada->presente = true;
+        entrada->modificado = false;
+        entrada->uso = true;
 
         dictionary_put(tabla->paginas, clave_pag, entrada);
         free(clave_pag);
