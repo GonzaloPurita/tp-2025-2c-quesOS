@@ -473,7 +473,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
 
     agregar_a_paquete(respuesta, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(respuesta, &tamanio, sizeof(int));
-    agregar_a_paquete(respuesta, contenido, tamanio);
+    agregar_a_paquete(respuesta, contenido, tamanio + 1);
     agregar_a_paquete(respuesta, formato->tag, strlen(formato->tag) + 1);
 
     enviar_paquete(respuesta, conexionMaster);
@@ -567,9 +567,9 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         int nro_pagina = atoi(key);
         int frame_index = entrada->indice_frame;
 
-        char* contenido_pagina = malloc(TAM_PAGINA);
-        memcpy(contenido_pagina,MEMORIA + (frame_index * TAM_PAGINA),TAM_PAGINA);
-        log_debug(loggerWorker,"Posicion en memoria de la pagina %d: %d",nro_pagina, (frame_index * TAM_PAGINA));
+        // BLOQUE COMPLETO A ENVIAR
+        char* contenido_bloque = malloc(TAM_PAGINA);
+        memcpy(contenido_bloque, MEMORIA + frame_index * TAM_PAGINA, TAM_PAGINA);
 
         t_paquete* paquete = crear_paquete();
         paquete->codigo_operacion = OP_WRITE;
@@ -578,29 +578,27 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
         agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
 
+        // nro_pag == nro_bloque
         agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
 
-        agregar_a_paquete(paquete, contenido_pagina, TAM_PAGINA);
+        agregar_a_paquete(paquete, contenido_bloque, TAM_PAGINA);
         agregar_a_paquete(paquete, &TAM_PAGINA, sizeof(int));
 
         enviar_paquete(paquete, conexionStorage);
         eliminar_paquete(paquete);
-        free(contenido_pagina);
+        free(contenido_bloque);
 
         entrada->modificado = false;
         frames[frame_index].modificado = false;
 
         op_code rta = recibir_operacion(conexionStorage);
         t_list* rtaList = recibir_paquete(conexionStorage);
+        if (rtaList) list_destroy_and_destroy_elements(rtaList, free);
 
-        if (rta == OP_SUCCESS) {
-            log_debug(loggerWorker,"Página %d flusheada correctamente",nro_pagina);
-        } else {
-            log_error(loggerWorker,"Error en flush de página %d",nro_pagina);
-        }
-
-        if (rtaList != NULL)
-            list_destroy_and_destroy_elements(rtaList, free);
+        if (rta == OP_SUCCESS)
+            log_debug(loggerWorker,"Flush OK página/bloque %d", nro_pagina);
+        else
+            log_error(loggerWorker,"Error flush en página/bloque %d", nro_pagina);
     }
 
     list_destroy(keys);

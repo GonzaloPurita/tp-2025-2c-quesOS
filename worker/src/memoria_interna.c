@@ -88,30 +88,33 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
     free(clave_tabla);
 
-    for (int p = pagina_inicio; p < pagina_fin; p++) { // podria ser <= ?
+    for (int p = pagina_inicio; p <= pagina_fin; p++) { 
         char* clave_pag  = string_itoa(p);
         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
         free(clave_pag);
 
+        if (entrada == NULL) {
+            log_error(loggerWorker, "Error: Intento de escritura en pagina %d no cargada", p);
+            break;
+        }
+
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
 
+        // Calculamos cuánto escribir en esta página
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
 
-        //memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar); // estoy guardando la posicion en donde se queda el string valor porque ese string puede quedar repartido en varias paginas
-
-        if (offset == direccion_base % TAM_PAGINA) {
-            // solo limpiar la primera vez que se escribe sobre esta página
-            memset(MEMORIA + frame * TAM_PAGINA, 0, TAM_PAGINA);
-        }
+        // Si la página es nueva, pedir_pagina_a_storage ya debió traerla limpia o con datos.
         memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
 
-        entrada->modificado = true; // marco como la entrada como modificada
-        frames[frame].modificado = true; // marco el frame como modificado
+        entrada->modificado = true; 
+        frames[frame].modificado = true; 
+        entrada->uso = true; 
+        frames[frame].uso = true;
 
         bytes_restantes -= bytes_a_usar;
         posicion_valor += bytes_a_usar;
-        offset = 0;
+        offset = 0; // Para las siguientes páginas, el offset siempre arranca en 0
     }
 }
 
@@ -198,8 +201,7 @@ int elegir_victima_CLOCKM() {
     }
 }
 
-void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
-
+void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     char clave_tabla[128];
     snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
 
@@ -207,21 +209,71 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
 
     if (tabla == NULL) {
         char* clave_heap = strdup(clave_tabla);
-        log_info(loggerWorker, "Creando tabla de páginas nueva para %s:%s", formato->file_name, formato->tag);
-
         tabla = malloc(sizeof(tabla_pag));
         tabla->file = strdup(formato->file_name);
         tabla->tag  = strdup(formato->tag);
         tabla->paginas = dictionary_create();
-
         dictionary_put(diccionario_tablas, clave_heap, tabla);
     }
 
     int marco = obtener_marco_libre_o_victima();
 
-    int paginasXbloque = TAM_BLOQUE / TAM_PAGINA;
-    int nro_bloque = nro_pagina / paginasXbloque;
+    if (frames[marco].ocupado) {
+        
+        if (frames[marco].modificado) {
+            log_info(loggerWorker, "SWAP OUT: La página %d de %s:%s está sucia. Guardando en Storage...", 
+                     frames[marco].page_num, frames[marco].file, frames[marco].tag);
 
+            t_paquete* paquete = crear_paquete();
+            paquete->codigo_operacion = OP_WRITE; 
+
+            agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
+            agregar_a_paquete(paquete, frames[marco].file, strlen(frames[marco].file) + 1);
+            agregar_a_paquete(paquete, frames[marco].tag, strlen(frames[marco].tag) + 1);
+            agregar_a_paquete(paquete, &frames[marco].page_num, sizeof(int)); // nro_bloque/pagina
+
+            void* contenido_victima = MEMORIA + (marco * TAM_PAGINA);
+            agregar_a_paquete(paquete, contenido_victima, TAM_PAGINA);
+            
+            int tam_pag = TAM_PAGINA; 
+            agregar_a_paquete(paquete, &tam_pag, sizeof(int));
+
+            enviar_paquete(paquete, conexionStorage);
+            eliminar_paquete(paquete);
+
+            op_code rta = recibir_operacion(conexionStorage);
+            t_list* rtaList = recibir_paquete(conexionStorage);
+            if(rtaList) list_destroy_and_destroy_elements(rtaList, free);
+
+            if (rta != OP_SUCCESS) {
+                log_error(loggerWorker, "CRITICAL: Falló el guardado de página víctima. Datos perdidos.");
+            } else {
+                log_debug(loggerWorker, "Página víctima guardada OK.");
+            }
+        }
+
+        char* clave_ant = string_from_format("%s:%s", frames[marco].file, frames[marco].tag);
+        tabla_pag* tabla_ant = dictionary_get(diccionario_tablas, clave_ant);
+
+        if (tabla_ant != NULL) {
+            char* clave_pag_ant = string_itoa(frames[marco].page_num);
+            entrada_pag* entrada_ant = dictionary_get(tabla_ant->paginas, clave_pag_ant);
+
+            if (entrada_ant != NULL) {
+                entrada_ant->presente = false;     // Ya no está en RAM
+                entrada_ant->modificado = false;   // Ya se guardó (o estaba limpia)
+                entrada_ant->indice_frame = -1;
+            }
+            free(clave_pag_ant);
+        }
+        free(clave_ant);
+
+        // Liberar strings del marco viejo
+        if (frames[marco].file) free(frames[marco].file);
+        if (frames[marco].tag) free(frames[marco].tag);
+    }
+
+    int nro_bloque = nro_pagina; 
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
 
@@ -233,52 +285,46 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
-    op_code cod_op = recibir_operacion(conexionStorage);
+    op_code op = recibir_operacion(conexionStorage);
 
-    if (cod_op == OP_SUCCESS) {
-
-        t_list* lista = recibir_paquete(conexionStorage);
-        char* contenido = list_get(lista, 0);
-
-        int offset_en_bloque = (nro_pagina % paginasXbloque) * TAM_PAGINA;
-
-        // Copiar contenido a memoria interna
-        void* destino = MEMORIA + marco * TAM_PAGINA;
-        memset(destino, 0, TAM_PAGINA);
-        memcpy(destino, contenido + offset_en_bloque, TAM_PAGINA);
-
-        frames[marco].ocupado = true;
-        frames[marco].modificado = false;
-        frames[marco].uso = true;
-        frames[marco].page_num = nro_pagina;
-        frames[marco].timestamp = obtener_timestamp();
-
-        // Si ya había strings viejos, los libero
-        if (frames[marco].file) free(frames[marco].file);
-        if (frames[marco].tag)  free(frames[marco].tag);
-
-        frames[marco].file = strdup(formato->file_name);
-        frames[marco].tag  = strdup(formato->tag);
-
-        char* clave_pag = string_itoa(nro_pagina);
-
-        entrada_pag* entrada = malloc(sizeof(entrada_pag));
-        entrada->indice_frame = marco;
-        entrada->presente = true;
-        entrada->modificado = false;
-        entrada->uso = true;
-
-        dictionary_put(tabla->paginas, clave_pag, entrada);
-        free(clave_pag);
-
-        list_destroy_and_destroy_elements(lista, free);
-
-        log_debug(loggerWorker, "Contenido de página %d recibido desde Storage en marco %d", nro_pagina, marco);
-    }
-    else {
-        log_error(loggerWorker,"Fallo al pedir página al Storage. Código recibido: %d", cod_op);
-
+    if (op != OP_SUCCESS) {
+        log_error(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
+        return; 
     }
+
+    t_list* lista = recibir_paquete(conexionStorage);
+    char* contenido_bloque = list_get(lista, 0);
+    
+    // Copiar contenido a memoria física
+    memcpy(MEMORIA + marco * TAM_PAGINA, contenido_bloque, TAM_PAGINA);
+
+    // Actualizar Frame
+    frames[marco].ocupado = true;
+    frames[marco].modificado = false; // Recién traída de disco -> limpia
+    frames[marco].uso = true;
+    frames[marco].page_num = nro_pagina;
+    frames[marco].timestamp = obtener_timestamp();
+    frames[marco].file = strdup(formato->file_name);
+    frames[marco].tag  = strdup(formato->tag);
+
+    char* clave_pag = string_itoa(nro_pagina);
+    entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
+
+    if (entrada == NULL) {
+        entrada = malloc(sizeof(entrada_pag));
+        entrada->modificado = false; 
+        dictionary_put(tabla->paginas, clave_pag, entrada);
+    } 
+    
+    entrada->presente = true;
+    entrada->uso = true;
+    entrada->indice_frame = marco;
+
+    free(clave_pag);
+    list_destroy_and_destroy_elements(lista, free);
+
+    log_debug(loggerWorker, "SWAP IN: Página %d de %s:%s cargada en marco %d", 
+              nro_pagina, formato->file_name, formato->tag, marco);
 }
