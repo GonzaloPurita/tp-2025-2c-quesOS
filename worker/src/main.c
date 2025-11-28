@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
     agregar_a_paquete(paquete, id, strlen(id)+1);
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
-    
+
     free(puertoStorage);
     log_info(loggerWorker, "la conexion con storage es: %d", conexionStorage);
     pedir_tamanio_de_bloque(); // llega el TAM_BLOQUE (global)
@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
     iniciar_memoria(); // inicializa memoria interna usando el TAM_BLOQUE
 
     // --- Conexión a Master ---
+    log_debug(loggerWorker, "Conectando con Master en %s:%d", configWorker->ip_master, configWorker->puerto_master);
     char* puertoMaster = string_itoa(configWorker->puerto_master);
     conexionMaster = crearConexionCliente(configWorker->ip_master, puertoMaster);
     free(puertoMaster);

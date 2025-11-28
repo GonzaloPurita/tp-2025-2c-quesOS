@@ -83,11 +83,12 @@ void recibirCliente(void* cliente) {
             case ID_WORKER: {
                 agregarWorker();
                 if(list_size(datosRecibidos) > 0) {
-                    idWorker = list_get(datosRecibidos, 0);
+                    idWorker = strdup(list_get(datosRecibidos, 0));
                     log_info(loggerStorage, "Worker con ID %s conectado. Total Workers: %d", idWorker, numeroWorkers);
                 } else {
                     log_info(loggerStorage, "Worker conectado. Total Workers: %d", numeroWorkers);
                 }
+                break;
             }
             case -1: {
                 // “##Se desconecta el Worker <WORKER_ID> - Cantidad de Workers: <CANTIDAD>”
@@ -97,6 +98,7 @@ void recibirCliente(void* cliente) {
                 } else {
                     log_info(loggerStorage, "##Se desconecta un Worker - Cantidad de Workers: %d", numeroWorkers);
                 }
+                free(idWorker);
                 return;
             }
             default:
