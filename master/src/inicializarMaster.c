@@ -179,6 +179,13 @@ void* atenderCliente(void* arg) {
             enviar_paquete(r, fd);
             eliminar_paquete(r);
 
+            t_conexion_qc* conexion = malloc(sizeof(t_conexion_qc));
+            conexion->fd = fd;
+            conexion->qid = qid;
+            
+            pthread_t hilo_monitor_qc;
+            pthread_create(&hilo_monitor_qc, NULL, monitorear_query_control, (void*) conexion);
+            pthread_detach(hilo_monitor_qc);
             // NO cerrar fd. Queda asociado a esta query para reenviar las operaciones de worker
             return NULL;
         }
@@ -189,4 +196,109 @@ void* atenderCliente(void* arg) {
             break;
     }
     return NULL;
+}
+
+
+void* monitorear_query_control(void* arg) {
+    t_conexion_qc* conexion = (t_conexion_qc*) arg;
+    int fd = conexion->fd;
+    int qid = conexion->qid;
+    
+    // Loop que solo detecta desconexión
+    while (1) {
+        int cod_op = recibir_operacion(fd);
+        
+        if (cod_op <= 0) {
+            // Query Control se desconectó
+            log_warning(loggerMaster, "## Se desconecta un Query Control. Se finaliza la Query %d. Motivo: DESCONEXION", qid);
+            
+            query_control_desconectado(qid);
+            break;
+        }
+        // Cualquier otra cosa que se reciba ya se haga con el QC (tipo mandarle lecturas) se hace en otro hilo
+    }
+    
+    free(conexion);
+    return NULL;
+}
+
+void query_control_desconectado(int qid) {
+    // Buscar la query en las colas
+    t_query* query = NULL;
+    estado_query estado_actual;
+    
+    // 1) Buscar en READY
+    pthread_mutex_lock(&mutex_cola_ready);
+    for (int i = 0; i < list_size(cola_ready); i++) {
+        t_query* q = list_get(cola_ready, i);
+        if (q->QCB->QID == qid) {
+            query = q;
+            list_remove(cola_ready, i);
+            estado_actual = Q_READY;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cola_ready);
+    
+    // 2) Si no está en READY, buscar en EXEC
+    if (!query) {
+        pthread_mutex_lock(&mutex_cola_exec);
+        for (int i = 0; i < list_size(cola_exec); i++) {
+            t_query* q = list_get(cola_exec, i);
+            if (q->QCB->QID == qid) {
+                query = q;
+                list_remove(cola_exec, i);
+                estado_actual = Q_EXEC;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&mutex_cola_exec);
+    }
+    
+    // 3) Si no se encontró, ya terminó o está en EXIT
+    if (!query) {
+        log_debug(loggerMaster, "Query %d ya finalizó o no existe", qid);
+        return;
+    }
+    
+    // 4) Logueo la desconexión
+    log_info(loggerMaster, "## Se desconecta un Query Control. Se finaliza la Query %d con prioridad %d. Nivel multiprocesamiento %d",
+             qid, query->prioridad_actual, workers_conectados());
+    
+    // 5) Si estaba en EXEC, desalojar del Worker
+    if (estado_actual == Q_EXEC) {
+        t_conexionWorker* worker = encontrarWorkerPorQid(qid);
+        if (worker) {
+            log_info(loggerMaster, "## Se desaloja la Query <%d> (<%d>) del Worker <%s> - Motivo: DESCONEXION",
+                     qid, query->prioridad_actual, worker->id);
+            
+            // Enviar DESALOJO al Worker
+            t_paquete* p = crear_paquete();
+            p->codigo_operacion = DESALOJO;
+            agregar_a_paquete(p, &qid, sizeof(int));
+            enviar_paquete(p, worker->fd);
+            eliminar_paquete(p);
+            
+            // Marcar worker como libre (no esperar RTA_DESALOJO en este caso)
+            worker_marcar_libre_por_fd(worker->fd);
+
+            if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
+                sem_post(&sem_workers_disponibles);
+            } else{
+                sem_post(&hay_query_ready);
+            }
+            
+        }
+    }
+    
+    // 6) Mover la query a EXIT
+    actualizarMetricas(estado_actual, Q_EXIT, query);
+    pthread_mutex_lock(&mutex_cola_exit);
+    list_add(cola_exit, query);
+    pthread_mutex_unlock(&mutex_cola_exit);
+    
+    // 7) Si había una query esperando, planificar
+    if (estado_actual == Q_EXEC) {
+        // El worker quedó libre, el planificador lo usará automáticamente
+    }
 }

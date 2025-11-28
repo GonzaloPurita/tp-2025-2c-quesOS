@@ -63,7 +63,7 @@ int worker_registrar(char* id, int fd) {
     int list_size_now = list_size(LISTA_WORKERS);
     pthread_mutex_unlock(&mutex_workers);
 
-    return 1;
+    return list_size_now;
 }
 
 void worker_marcar_libre_por_fd(int fd) {
@@ -237,8 +237,9 @@ void* atenderWorker(void* arg){
             pthread_mutex_unlock(&mutex_cola_exec);
 
             if (!actualizado) {
-                // Si no está en READY puede ser carrera rara: log y seguimos 
-                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY para actualizar PC=%d", qid, pc);
+                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY (posible desconexión de QC)", qid);
+                
+                break;  
             } else {
                 log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
             }
