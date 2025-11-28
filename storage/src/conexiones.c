@@ -114,7 +114,6 @@ void recibirCliente(void* cliente) {
             list_destroy_and_destroy_elements(datosRecibidos, free);
             datosRecibidos = NULL;
         }
-        log_debug(loggerStorage, "Operacion atendida correctamente.");
     }
 }
 

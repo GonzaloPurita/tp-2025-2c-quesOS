@@ -292,13 +292,17 @@ void* atenderWorker(void* arg){
             sem_post(&sem_workers_disponibles);
 
             // 6) Enviar respuesta al Query Control
-            t_paquete* r = crear_paquete();
-            r->codigo_operacion = QUERY_FINALIZADA;
-            agregar_a_paquete(r, &qid, sizeof(int));
-            enviar_paquete(r, fd_qc);
-            eliminar_paquete(r);
-            log_info(loggerMaster, "## Se terminó la Query <%d> en el Worker <%s>", qid, id);
-            return NULL;
+                t_paquete* r = crear_paquete();
+                r->codigo_operacion = QUERY_FINALIZADA;
+                agregar_a_paquete(r, &qid, sizeof(int));
+                char* motivo = "EXITO";
+                agregar_a_paquete(r, motivo, strlen(motivo) + 1);
+                enviar_paquete(r, fd_qc);
+                eliminar_paquete(r);
+                
+                log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
+
+            return NULL; //SI TERMINO LA QUERY, DEJO DE ATENDER AL WORKER, CUANDO REPLANIFICO CREO EL HILO OTRA VEZ
         }
         case OP_READ: {
             // payload desde Worker: [qid:int][n:int][bytes:n][tag:char*]
@@ -363,6 +367,78 @@ void* atenderWorker(void* arg){
             }
             if (p) list_destroy_and_destroy_elements(p, free);
             break;
+        }
+        case OP_ERROR: {
+            t_list* p = recibir_paquete(fd);
+            if (!p || list_size(p) < 2) {
+                log_error(loggerMaster, "Worker %s: OP_ERROR mal formado", id);
+                if (p) list_destroy_and_destroy_elements(p, free);
+                break;
+            }
+            
+            int qid = conexionWorker->qid_actual;  // qid
+            char* motivo = (char*) list_get(p, 1);  // motivo
+            
+            log_error(loggerMaster, "## Query %d finalizada con ERROR en Worker %s - Motivo: %s", qid, id, motivo);
+            
+            char* motivo_copia = strdup(motivo);
+            list_destroy_and_destroy_elements(p, free);
+            
+            pthread_mutex_lock(&mutex_cola_exec);
+            t_query* q = NULL;
+            for (int i = 0; i < list_size(cola_exec); i++) {
+                t_query* it = list_get(cola_exec, i);
+                if (it->QCB->QID == qid) {
+                    q = it;
+                    list_remove(cola_exec, i);
+                    break;
+                }
+            }
+            pthread_mutex_unlock(&mutex_cola_exec);
+            
+            if (!q) {
+                log_warning(loggerMaster, "OP_ERROR: QID=%d no estaba en EXEC", qid);
+                free(motivo_copia);
+                break;
+            }
+            
+            int fd_qc = q->fd_qc;
+            
+            // muevo la query a EXIT
+            actualizarMetricas(Q_EXEC, Q_EXIT, q);
+            pthread_mutex_lock(&mutex_cola_exit);
+            list_add(cola_exit, q);
+            pthread_mutex_unlock(&mutex_cola_exit);
+            
+            // marco libre al worker
+            worker_marcar_libre_por_fd(fd);
+            
+            // Replanifico según el algoritmo
+            if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0) {
+                sem_post(&sem_workers_disponibles);
+            } else {
+                pthread_mutex_lock(&mutex_cola_ready);
+                int hay_queries = !list_is_empty(cola_ready);
+                pthread_mutex_unlock(&mutex_cola_ready);
+                
+                if (hay_queries) {
+                    sem_post(&hay_query_ready);
+                }
+            }
+            
+            // Notificar al Query Control
+            t_paquete* r = crear_paquete();
+            r->codigo_operacion = QUERY_FINALIZADA;
+            agregar_a_paquete(r, &qid, sizeof(int));
+            agregar_a_paquete(r, motivo_copia, strlen(motivo_copia) + 1);
+            enviar_paquete(r, fd_qc);
+            eliminar_paquete(r);
+            
+            free(motivo_copia);
+            
+            log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
+            
+            break; 
         }
 
         default:

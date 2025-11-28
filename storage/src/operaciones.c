@@ -123,18 +123,21 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
 
     t_config *metadata = getMetaData(nombreFile, nombreTag);
     if (metadata == NULL) {
+        logearResultadoOP(ERROR_FILE_NOT_FOUND, "READ");
         enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
         return;
     }
 
     int nroBloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, nroBloqueLogico);
     if (nroBloqueFisico == -1) {
+        logearResultadoOP(ERROR_OUT_OF_BOUNDS, "READ");
         enviarRespuesta(ERROR_OUT_OF_BOUNDS, socket_cliente);
         return;
     }
 
     char* datos = leerBloqueFisico(nroBloqueFisico);
     if (datos == NULL) {
+        logearResultadoOP(OP_FAILED, "READ");
         enviarRespuesta(OP_FAILED, socket_cliente);
         return;
     }

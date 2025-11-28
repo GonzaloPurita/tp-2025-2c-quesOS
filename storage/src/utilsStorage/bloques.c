@@ -239,7 +239,7 @@ char* leerBloqueFisico(int numeroBloqueFisico) {
         return NULL;
     }
 
-    char* datos = malloc(superblock->blocksize);
+    char* datos = malloc(superblock->blocksize + 1); // +1 para el '\0'
     if (datos == NULL) {
         log_error(loggerStorage, "Error leyendo bloque físico %s, no se pudo reservar memoria", rutaBloque);
         fclose(bloque);
@@ -256,6 +256,7 @@ char* leerBloqueFisico(int numeroBloqueFisico) {
         return NULL;
     }
 
+    datos[superblock->blocksize] = '\0';
     fclose(bloque);
     free(rutaBloque);
     return datos;
