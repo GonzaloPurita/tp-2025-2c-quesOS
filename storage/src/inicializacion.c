@@ -17,13 +17,13 @@ void inicializarFS(char* archivoConfiguracion) {
         inicializarBitmap();
         bitarray_set_bit(bitmap, 0); 
         // Inicializo índice de hashes vacío
-        incializarHashMap();
+        incializarHashMap(true);
         crearFileInicial();
     }
     else { // Tenemos que usar lo que ya tenemos
         cargarBitmap();
         // Abro índice de hashes existente (o lo creo si falta)
-        incializarHashMap();
+        incializarHashMap(false);
     }
     log_debug(loggerStorage, "Sistema de archivos listo para usarse");
 }

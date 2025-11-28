@@ -36,7 +36,7 @@ bool esta_en_memoria(t_formato* formato, int nro_pagina) {
     entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pagina);
 
     if (!entrada) {
-        log_error(loggerWorker, "No existe entrada para la página %d en %s:%s", nro_pagina, formato->file_name, formato->tag);
+        log_warning(loggerWorker, "No existe entrada para la página %d en %s:%s", nro_pagina, formato->file_name, formato->tag);
         return false;
     }
 
