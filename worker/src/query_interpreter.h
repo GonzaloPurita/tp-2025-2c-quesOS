@@ -68,6 +68,7 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato);
 void manejar_respuesta_storage(op_code respuesta, char* operacion);
 void notificar_error_a_master(char* motivo);
 void* correr_query_en_hilo(void* arg);
+char* generar_clave(t_formato* f);
 
 //ejecutar instrucciones
 void ejecutar_create(t_instruccion* inst);

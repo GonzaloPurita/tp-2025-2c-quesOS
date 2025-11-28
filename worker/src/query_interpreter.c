@@ -443,7 +443,7 @@ void ejecutar_end(t_instruccion* inst){
 
 
 void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>  ej: READ MATERIAS:BASE 0 8
-    char* recurso = inst->parametros[0];           
+    char* recurso = inst->parametros[0];
     int direccion_base = atoi(inst->parametros[1]);
     int tamanio = atoi(inst->parametros[2]);
 
@@ -487,8 +487,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
 }
 
 void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
-    char* recurso = inst->parametros[0];
-               
+    char* recurso = inst->parametros[0];       
     
     t_formato* formato = mapear_formato(recurso);
     int direccion_base = atoi(inst->parametros[1]);
@@ -552,59 +551,59 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
 
 // envia todas las pags modificadas de la tabla 'tabla' para el file:tag 'formato'.
 void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
-    if (tabla == NULL || formato == NULL) return;
 
-    t_list* keys = dictionary_keys(tabla->paginas); // lista de strings con numeros de pagina
+    if (!tabla || !formato) return;
+
+    int paginasXbloque = TAM_BLOQUE / TAM_PAGINA;
+
+    t_list* keys = dictionary_keys(tabla->paginas);
+
     for (int i = 0; i < list_size(keys); i++) {
+
         char* key = list_get(keys, i);
         entrada_pag* entrada = dictionary_get(tabla->paginas, key);
-        if (entrada == NULL) continue;
 
-        if (entrada->presente && entrada->modificado) {
-            int nro_pagina = atoi(key);
-            int frame_index = entrada->indice_frame;
-            int dir_fisica = frame_index * TAM_PAGINA;
+        if (!entrada) continue;
+        if (!entrada->presente || !entrada->modificado) continue;
 
-            // Copio el contenido del marco
-            char* contenido = malloc(TAM_PAGINA);
-            memcpy(contenido, MEMORIA + dir_fisica, TAM_PAGINA);
+        int nro_pagina = atoi(key);
+        int frame = entrada->indice_frame;
+        int nro_bloque_logico = nro_pagina / paginasXbloque;
 
-            // Armo paquete: usar OP_WRITE por bloque
-            t_paquete* paquete = crear_paquete();
-            paquete->codigo_operacion = OP_WRITE;
-            // Orden esperado por Storage: [File, Tag, NroBloque, Contenido, Tamaño]
-            agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
-            agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
-            agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
-            agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
-            agregar_a_paquete(paquete, contenido, TAM_PAGINA);
-            agregar_a_paquete(paquete, &TAM_PAGINA, sizeof(int));
+        // agarro el bloque completo
+        char* contenido_bloque = malloc(TAM_BLOQUE);
 
-            enviar_paquete(paquete, conexionStorage);
-            eliminar_paquete(paquete);
+        int offset = (nro_pagina % paginasXbloque) * TAM_PAGINA;
 
-            // --- Opcional: esperar respuesta del Storage (recomendado si el mock lo implementa) ---
-            // int resp = recibir_operacion(conexionStorage);
-            // if (resp != RTA_OK) { log_error(...); /* manejar error */ }
-            // --------------------------------------------------------------------
+        memcpy(contenido_bloque + offset, MEMORIA + frame * TAM_PAGINA, TAM_PAGINA);
 
-            op_code rta = recibir_operacion(conexionStorage);
-            t_list* rtaList = recibir_paquete(conexionStorage);
-            list_destroy_and_destroy_elements(rtaList, free);
-            
-            if (rta != OP_SUCCESS) {
-                log_error(loggerWorker, "Fallo al flushear pagina %d", nro_pagina);
-            } else {
-                log_debug(loggerWorker, "Página %d flusheada correctamente", nro_pagina);
-            }
+        // pa storage
+        t_paquete* paquete = crear_paquete();
+        paquete->codigo_operacion = OP_WRITE;
 
-            // marco q no esta modificada la pag
-            entrada->modificado = false;
-            frames[frame_index].modificado = false;
+        agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
+        agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
+        agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
 
-            log_debug(loggerWorker, "Página flusheada: %s:%s pagina=%d marco=%d", formato->file_name, formato->tag, nro_pagina, frame_index);
+        agregar_a_paquete(paquete, &nro_bloque_logico, sizeof(int));
+        agregar_a_paquete(paquete, contenido_bloque, TAM_BLOQUE);
+        agregar_a_paquete(paquete, &TAM_BLOQUE, sizeof(int));
 
-            free(contenido);
+        enviar_paquete(paquete, conexionStorage);
+        eliminar_paquete(paquete);
+        free(contenido_bloque);
+
+        entrada->modificado = false;
+        frames[frame].modificado = false;
+
+        op_code rta = recibir_operacion(conexionStorage);
+        t_list* rtaList = recibir_paquete(conexionStorage);
+        list_destroy_and_destroy_elements(rtaList, free);
+
+        if (rta == OP_SUCCESS) {
+            log_debug(loggerWorker, "Página %d flusheada OK", nro_pagina);
+        } else {
+            log_error(loggerWorker, "Error al flushear pag %d", nro_pagina);
         }
     }
 
@@ -736,4 +735,8 @@ void destruir_query_context(t_query_context* ctx) {
 
     free(ctx->nombre_query);  // strdup en la creación
     free(ctx);
+}
+
+char* generar_clave(t_formato* f) {
+    return string_from_format("%s:%s", f->file_name, f->tag);
 }

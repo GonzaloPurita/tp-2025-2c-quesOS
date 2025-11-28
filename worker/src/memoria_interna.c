@@ -21,23 +21,24 @@ t_list* paginas_necesarias(int direccion_base, int tamanio) {
 }
 
 bool esta_en_memoria(t_formato* formato, int nro_pagina) {
-    char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
-    tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_tabla);
-    free(clave_tabla);
+    char clave_tabla[256];
+    snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
 
-    if (tabla == NULL) {
+    tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_tabla);
+    if (!tabla) {
         log_info(loggerWorker, "No existe tabla de páginas para %s:%s", formato->file_name, formato->tag);
         return false;
     }
 
-    char* clave_pagina = string_from_format("%d", nro_pagina);
-    entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pagina);
-    free(clave_pagina);
+    char clave_pagina[16];
+    snprintf(clave_pagina, sizeof(clave_pagina), "%d", nro_pagina);
 
-    if (entrada == NULL) {
+    entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pagina);
+
+    if (!entrada) {
         log_error(loggerWorker, "No existe entrada para la página %d en %s:%s", nro_pagina, formato->file_name, formato->tag);
         return false;
-    } 
+    }
 
     return entrada->presente;
 }
@@ -51,11 +52,14 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
     int bytes_restantes = tamanio;
     int posicion_buffer = 0;
 
+    char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
+    tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
+    free(clave_tabla);
+
     for (int p = pagina_inicio; p <= pagina_fin; p++) {
-        char* clave = string_itoa(p);
-        tabla_pag* tabla = dictionary_get(diccionario_tablas, string_from_format("%s:%s", formato->file_name, formato->tag));
-        entrada_pag* entrada = dictionary_get(tabla->paginas, clave);
-        free(clave);
+        char* clave_pag = string_itoa(p);
+        entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
+        free(clave_pag);
 
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
@@ -80,11 +84,14 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
     int bytes_restantes = tamanio_valor;
     int posicion_valor = 0;
 
+    char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
+    tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
+    free(clave_tabla);
+
     for (int p = pagina_inicio; p <= pagina_fin; p++) {
-        char* clave = string_itoa(p);
-        tabla_pag* tabla = dictionary_get(diccionario_tablas, string_from_format("%s:%s", formato->file_name, formato->tag));
-        entrada_pag* entrada = dictionary_get(tabla->paginas, clave);
-        free(clave);
+        char* clave_pag  = string_itoa(p);
+        entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
+        free(clave_pag);
 
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
@@ -187,16 +194,31 @@ int elegir_victima_CLOCKM() {
 
 void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
 
+    char clave_tabla[128];
+    snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
+
+    tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_tabla);
+
+    if (tabla == NULL) {
+        char* clave_heap = strdup(clave_tabla);
+        log_info(loggerWorker, "Creando tabla de páginas nueva para %s:%s", formato->file_name, formato->tag);
+
+        tabla = malloc(sizeof(tabla_pag));
+        tabla->file = strdup(formato->file_name);
+        tabla->tag  = strdup(formato->tag);
+        tabla->paginas = dictionary_create();
+
+        dictionary_put(diccionario_tablas, clave_heap, tabla);
+    }
+
     int marco = obtener_marco_libre_o_victima();
 
-    //int paginasXbloque = TAM_MEMORIA / TAM_BLOQUE;
-    // int paginasXbloque = TAM_PAGINA / TAM_BLOQUE;
     int paginasXbloque = TAM_BLOQUE / TAM_PAGINA;
     int nro_bloque = nro_pagina / paginasXbloque;
 
-    // paquete para Storage (enviamos nro_pagina)
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
+
     agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
@@ -208,56 +230,48 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
     op_code cod_op = recibir_operacion(conexionStorage);
 
     if (cod_op == OP_SUCCESS) {
+
         t_list* lista = recibir_paquete(conexionStorage);
         char* contenido = list_get(lista, 0);
 
         int offset_en_bloque = (nro_pagina % paginasXbloque) * TAM_PAGINA;
 
-        memcpy(MEMORIA + marco * TAM_PAGINA, contenido + offset_en_bloque, TAM_PAGINA); // copio el contenido recibido en el marco asignado
+        // Copiar contenido a memoria interna
+        memcpy(MEMORIA + marco * TAM_PAGINA, contenido + offset_en_bloque, TAM_PAGINA);
 
-        // seteo el frame
         frames[marco].ocupado = true;
         frames[marco].modificado = false;
         frames[marco].uso = true;
-
-        frames[marco].file = strdup(formato->file_name);
-        frames[marco].tag = strdup(formato->tag);
         frames[marco].page_num = nro_pagina;
         frames[marco].timestamp = obtener_timestamp();
 
-        // actualizo la tabla de páginas
-        char* clave_file_tag = string_from_format("%s:%s", formato->file_name, formato->tag);
-        ////char* clave = string_itoa(nro_pagina);
-        // busco en la tabla
-        tabla_pag* tabla = dictionary_get(diccionario_tablas, clave_file_tag);
+        // Si ya había strings viejos, los libero
+        if (frames[marco].file) free(frames[marco].file);
+        if (frames[marco].tag)  free(frames[marco].tag);
 
-        //si la tabla no existe (si es la primera escritura) ser crea!!!!
-        if(tabla == NULL){
-            log_info(loggerWorker, "Creando tabla de páginas nueva para %s:%s", formato->file_name, formato->tag);
-            tabla = malloc(sizeof(tabla_pag));
-            tabla->file = strdup(formato->file_name);
-            tabla->tag = strdup(formato->tag);
-            tabla->paginas = dictionary_create();
-            dictionary_put(diccionario_tablas, clave_file_tag, tabla);
-        }
-        free(clave_file_tag);
+        frames[marco].file = strdup(formato->file_name);
+        frames[marco].tag  = strdup(formato->tag);
 
-        // ahora q nos aseguramos q la tabla existe..
-        char* clave_pagina = string_itoa(nro_pagina);
+        char* clave_pag = string_itoa(nro_pagina);
+
         entrada_pag* entrada = malloc(sizeof(entrada_pag));
         entrada->indice_frame = marco;
-        entrada->presente = true;
-        entrada->modificado = false;
-        entrada->uso = true;
-        
-        dictionary_put(tabla->paginas, clave_pagina, entrada);
-        free(clave_pagina);
+        entrada->presente     = true;
+        entrada->modificado   = false;
+        entrada->uso          = true;
+
+        dictionary_put(tabla->paginas, clave_pag, entrada);
+        free(clave_pag);
 
         list_destroy_and_destroy_elements(lista, free);
+
         log_debug(loggerWorker, "Contenido de página %d recibido desde Storage en marco %d", nro_pagina, marco);
-    } else {
-        // si Storage no responde SUCCESS
-        log_error(loggerWorker, "Fallo al pedir página al Storage. Código recibido: %d", cod_op);
+    }
+    else {
+        log_error(loggerWorker,
+                  "Fallo al pedir página al Storage. Código recibido: %d",
+                  cod_op);
+
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
     }
