@@ -127,6 +127,7 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
         enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
         return;
     }
+    config_destroy(metadata);
 
     int nroBloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, nroBloqueLogico);
     if (nroBloqueFisico == -1) {
@@ -340,8 +341,6 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
         log_error(loggerStorage, "Error escribiendo bloque lógico, el tamaño de los datos es inválido");
         return ERROR_OUT_OF_BOUNDS;
     }
-
-    log_debug(loggerStorage, "Voy a escribir: %s", datos);
 
     // Obtener metadata
     t_config* metadata = getMetaData(nombreFile, nombreTag);

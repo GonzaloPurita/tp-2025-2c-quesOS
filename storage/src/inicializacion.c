@@ -88,4 +88,5 @@ void crearBloques() {
         free(nombreBloque);
         free(rutaBloque);
     }
+    free(rutaBloquesFisicos);
 }

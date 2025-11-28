@@ -148,7 +148,7 @@ void cargarBitmap() {
 
     // Transformo ese bitmap en el struct de las commons
     bitmap = bitarray_create_with_mode(bitmap_mem, bytes_bitmap, LSB_FIRST);
-
+    free(path);
     close(fd); // Cierro el file descriptor, el mmap sigue existiendo
 }
 
