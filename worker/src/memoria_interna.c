@@ -140,7 +140,7 @@ int obtener_marco_libre_o_victima() {
 int elegir_victima() {
     if (strcmp(configWorker->algoritmo_reemplazo, "LRU") == 0) {
         return elegir_victima_LRU();
-    } 
+    }
     else if (strcmp(configWorker->algoritmo_reemplazo, "CLOCK-M") == 0) {
         return elegir_victima_CLOCKM();
     }
@@ -165,13 +165,13 @@ int elegir_victima_LRU() {
 
 int elegir_victima_CLOCKM() {
     int vueltas = 0;
-    int inicio = puntero_clock;
+    int inicio = puntero_clock; // arranca en cero
 
     while (1) {
         frame* frame = &frames[puntero_clock];
 
         // Caso 1: uso=0, modificado=0
-        if (frame->ocupado && !frame->uso && !frame->modificado) {
+        if (frame->ocupado && !frame->uso && !frame->modificado) { // no hace falta chequear ocupado
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
             log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=0): marco %d", victima);
@@ -273,7 +273,7 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
         if (frames[marco].tag) free(frames[marco].tag);
     }
 
-    int nro_bloque = nro_pagina; 
+    int nro_bloque = nro_pagina;
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
 

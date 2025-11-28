@@ -499,7 +499,7 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
     log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
 
-    // para cada página, verifica si está en memoria; si no, pedirla
+    // para cada página, verificamos si esta en memoria
     for (int i = 0; i < list_size(paginas); i++) { 
         int* nro_pagina = list_get(paginas, i);
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
@@ -509,7 +509,6 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
         }
     }
 
-    // escribir valor en memoria
     escribir_en_memoria(formato, direccion_base, valor);
 
     log_debug(loggerWorker, "Página marcada como dirty para %s:%s en base %d", formato->file_name, formato->tag, direccion_base);
