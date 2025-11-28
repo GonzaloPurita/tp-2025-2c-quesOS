@@ -268,9 +268,7 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
         log_debug(loggerWorker, "Contenido de página %d recibido desde Storage en marco %d", nro_pagina, marco);
     }
     else {
-        log_error(loggerWorker,
-                  "Fallo al pedir página al Storage. Código recibido: %d",
-                  cod_op);
+        log_error(loggerWorker,"Fallo al pedir página al Storage. Código recibido: %d", cod_op);
 
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);

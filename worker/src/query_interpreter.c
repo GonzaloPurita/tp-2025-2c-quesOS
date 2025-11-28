@@ -136,7 +136,7 @@ t_estado_query ejecutar_query(char* path_query) {
             bool error_flag = query_error_flag;
             pthread_mutex_unlock(&mutex_error);
             if (error_flag) {
-                log_debug(loggerWorker, "## Query %d abortada por error externo", query_actual->query_id);
+                log_warning(loggerWorker, "## Query %d abortada por error externo", query_actual->query_id);
                 estado_salida = QUERY_ERROR;
                 break;
             }
@@ -554,8 +554,6 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
 
     if (!tabla || !formato) return;
 
-    int paginasXbloque = TAM_BLOQUE / TAM_PAGINA;
-
     t_list* keys = dictionary_keys(tabla->paginas);
 
     for (int i = 0; i < list_size(keys); i++) {
@@ -567,17 +565,12 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         if (!entrada->presente || !entrada->modificado) continue;
 
         int nro_pagina = atoi(key);
-        int frame = entrada->indice_frame;
-        int nro_bloque_logico = nro_pagina / paginasXbloque;
+        int frame_index = entrada->indice_frame;
 
-        // agarro el bloque completo
-        char* contenido_bloque = malloc(TAM_BLOQUE);
+        char* contenido_pagina = malloc(TAM_PAGINA);
+        memcpy(contenido_pagina,MEMORIA + (frame_index * TAM_PAGINA),TAM_PAGINA);
+        log_debug(loggerWorker,"Posicion en memoria de la pagina %d: %d",nro_pagina, (frame_index * TAM_PAGINA));
 
-        int offset = (nro_pagina % paginasXbloque) * TAM_PAGINA;
-
-        memcpy(contenido_bloque + offset, MEMORIA + frame * TAM_PAGINA, TAM_PAGINA);
-
-        // pa storage
         t_paquete* paquete = crear_paquete();
         paquete->codigo_operacion = OP_WRITE;
 
@@ -585,26 +578,29 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
         agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
 
-        agregar_a_paquete(paquete, &nro_bloque_logico, sizeof(int));
-        agregar_a_paquete(paquete, contenido_bloque, TAM_BLOQUE);
-        agregar_a_paquete(paquete, &TAM_BLOQUE, sizeof(int));
+        agregar_a_paquete(paquete, &nro_pagina, sizeof(int));
+
+        agregar_a_paquete(paquete, contenido_pagina, TAM_PAGINA);
+        agregar_a_paquete(paquete, &TAM_PAGINA, sizeof(int));
 
         enviar_paquete(paquete, conexionStorage);
         eliminar_paquete(paquete);
-        free(contenido_bloque);
+        free(contenido_pagina);
 
         entrada->modificado = false;
-        frames[frame].modificado = false;
+        frames[frame_index].modificado = false;
 
         op_code rta = recibir_operacion(conexionStorage);
         t_list* rtaList = recibir_paquete(conexionStorage);
-        list_destroy_and_destroy_elements(rtaList, free);
 
         if (rta == OP_SUCCESS) {
-            log_debug(loggerWorker, "Página %d flusheada OK", nro_pagina);
+            log_debug(loggerWorker,"Página %d flusheada correctamente",nro_pagina);
         } else {
-            log_error(loggerWorker, "Error al flushear pag %d", nro_pagina);
+            log_error(loggerWorker,"Error en flush de página %d",nro_pagina);
         }
+
+        if (rtaList != NULL)
+            list_destroy_and_destroy_elements(rtaList, free);
     }
 
     list_destroy(keys);
