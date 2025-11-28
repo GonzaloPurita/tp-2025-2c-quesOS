@@ -287,9 +287,8 @@ void query_control_desconectado(int qid) {
             if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
                 sem_post(&sem_workers_disponibles);
             } else{
-                sem_post(&hay_query_ready);
+                sem_post(&rePlanificar);
             }
-            
         }
     }
     

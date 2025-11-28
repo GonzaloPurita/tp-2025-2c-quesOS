@@ -290,6 +290,7 @@ void* atenderWorker(void* arg){
             // 5) Marcamos el Worker como libre
             worker_marcar_libre_por_fd(fd);
             sem_post(&sem_workers_disponibles);
+            sem_post(&rePlanificar);
 
             // 6) Enviar respuesta al Query Control
                 t_paquete* r = crear_paquete();
@@ -417,13 +418,7 @@ void* atenderWorker(void* arg){
             if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0) {
                 sem_post(&sem_workers_disponibles);
             } else {
-                pthread_mutex_lock(&mutex_cola_ready);
-                int hay_queries = !list_is_empty(cola_ready);
-                pthread_mutex_unlock(&mutex_cola_ready);
-                
-                if (hay_queries) {
-                    sem_post(&hay_query_ready);
-                }
+                sem_post(&rePlanificar);
             }
             
             // Notificar al Query Control

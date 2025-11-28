@@ -103,7 +103,6 @@ bool crearMetaData(char* path) {
         config_destroy(metadata);
         return false;
     }
-    config_destroy(metadata);
     return true;
 }
 

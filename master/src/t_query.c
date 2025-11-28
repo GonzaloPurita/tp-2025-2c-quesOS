@@ -74,7 +74,7 @@ void agregarAReadyPorPrioridad(t_query* q){
 
     log_debug(loggerMaster, "READY <- Q (p=%d, p_act=%d) en idx %d", q->prioridad, q->prioridad_actual, i);
 
-    sem_post(&hay_query_ready); // despertar planificador
+    sem_post(&rePlanificar); // despertar planificador
 }
 
 

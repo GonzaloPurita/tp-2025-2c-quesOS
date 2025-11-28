@@ -20,7 +20,9 @@ void planificador_lanzar(void) {
 
 void planificarConDesalojoYAging() {
   while (1) {
-    sem_wait(&hay_query_ready);
+    log_debug(loggerMaster, "Planificador con desalojo esperando...");
+    sem_wait(&rePlanificar);
+    log_debug(loggerMaster, "Planificador con desalojo activado");
 
     pthread_mutex_lock(&mutex_cola_ready);
     t_query* query = list_is_empty(cola_ready) ? NULL : list_get(cola_ready, 0);
