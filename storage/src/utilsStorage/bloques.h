@@ -48,7 +48,7 @@ bool bloqueFisicoValido(int numeroBloqueFisico);
  * @param query_id ID de la query que realiza la operación.
  * @return true si la operación fue exitosa, false en caso de error.
  */
-bool escribirBloqueFisico(int numeroBloqueFisico, void* datos, size_t sizeDatos, bool agregar, int query_id);
+bool escribirBloqueFisico(int numeroBloqueFisico, char* datos, size_t sizeDatos, bool agregar, int query_id);
 
 /**
  * @brief Escribe el bloque inicial del sistema de almacenamiento.

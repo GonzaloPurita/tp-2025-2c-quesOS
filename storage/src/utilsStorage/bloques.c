@@ -52,7 +52,7 @@ bool escribirBloqueInicial() {
     return resultado;
 }
 
-bool escribirBloqueFisico(int numeroBloqueFisico, void* datos, size_t sizeDatos, bool agregar, int query_id) {
+bool escribirBloqueFisico(int numeroBloqueFisico, char* datos, size_t sizeDatos, bool agregar, int query_id) {
     if (datos == NULL) return false;
     if (!bloqueFisicoValido(numeroBloqueFisico)) return false;
 

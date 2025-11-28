@@ -309,19 +309,21 @@ void* atenderWorker(void* arg){
                 break;
             }
 
-            int   qid = *(int*) list_get(p, 0);
-            int   n   = *(int*) list_get(p, 1);
-            void* src =        list_get(p, 2);
-            char* tag_src =    list_get(p, 3);
+            int   qid = *(int*) list_get(p, 0); // query_id
+            int   n   = *(int*) list_get(p, 1); //tamanio
+            char* src =        list_get(p, 2); //contenido
+            char* tag_src =    list_get(p, 3); // tag del archivo
 
             // copio el buffer de datos
-            void* buf = malloc(n);
+            char* buf = malloc(n);
             memcpy(buf, src, n);
 
             // copio la tag para no usar memoria liberada
             char* tag = strdup(tag_src);
 
             list_destroy_and_destroy_elements(p, free);
+
+            log_debug(loggerMaster, "Leo este contenido: %s", buf);
 
             // 1) Verificar que el QID esté en EXEC y recuperar fd del QC
             int fd_qc = -1;

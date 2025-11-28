@@ -487,7 +487,8 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
 }
 
 void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
-    char* recurso = inst->parametros[0];           
+    char* recurso = inst->parametros[0];
+               
     
     t_formato* formato = mapear_formato(recurso);
     int direccion_base = atoi(inst->parametros[1]);

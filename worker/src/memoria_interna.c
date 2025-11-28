@@ -189,7 +189,9 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina){
 
     int marco = obtener_marco_libre_o_victima();
 
-    int paginasXbloque = TAM_MEMORIA / TAM_BLOQUE;
+    //int paginasXbloque = TAM_MEMORIA / TAM_BLOQUE;
+    // int paginasXbloque = TAM_PAGINA / TAM_BLOQUE;
+    int paginasXbloque = TAM_BLOQUE / TAM_PAGINA;
     int nro_bloque = nro_pagina / paginasXbloque;
 
     // paquete para Storage (enviamos nro_pagina)

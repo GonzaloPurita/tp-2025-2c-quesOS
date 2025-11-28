@@ -8,7 +8,7 @@ int contarElementos(char** array);
 void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int bytes, int* bloquesFisicos);
 op_code borrarTag(char* nombreFile, char* nombreTag, int query_id);
 op_code commitTag(char* nombreFile, char* nombreTag, int query_id);
-op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido, int query_id);
+op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, char* contenido, size_t sizeContenido, int query_id);
 void logearResultadoOP(op_code resultado, char* operacion);
 op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t, int query_id);
 
@@ -107,7 +107,7 @@ void writeFileTag(t_list* data, int socket_cliente) {
     char* nombreTag = list_get(data, 2);
     int nroBloqueLogico = *((int*) list_get(data, 3));
 
-    void* contenido = list_get(data, 4);
+    char* contenido = list_get(data, 4);
     int sizeContenido = *((int*) list_get(data, 5));
     op_code resultado = escribirBloqueLogico(nombreFile, nombreTag, nroBloqueLogico, contenido, sizeContenido, query_id);
     enviarRespuesta(resultado, socket_cliente);
@@ -140,7 +140,7 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
     }
 
     log_info(loggerStorage, "##%d - Bloque Lógico Leído %s:%s - Número de Bloque: %d", query_id, nombreFile, nombreTag, nroBloqueLogico);
-
+    log_debug(loggerStorage, "Datos leídos: %s", datos);
     t_paquete* paqueteRespuesta = crear_paquete();
     paqueteRespuesta->codigo_operacion = OP_SUCCESS;
     agregar_a_paquete(paqueteRespuesta, datos, superblock->blocksize);
@@ -315,7 +315,7 @@ op_code commitTag(char* nombreFile, char* nombreTag, int query_id) {
     return OP_SUCCESS;
 }
 
-op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* datos, size_t sizeDatos, int query_id) {
+op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, char* datos, size_t sizeDatos, int query_id) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
         log_error(loggerStorage, "Error escribiendo bloque lógico, el nombre del file o del tag es NULL");
@@ -337,6 +337,8 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
         log_error(loggerStorage, "Error escribiendo bloque lógico, el tamaño de los datos es inválido");
         return ERROR_OUT_OF_BOUNDS;
     }
+
+    log_debug(loggerStorage, "Voy a escribir: %s", datos);
 
     // Obtener metadata
     t_config* metadata = getMetaData(nombreFile, nombreTag);
