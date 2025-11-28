@@ -55,7 +55,7 @@ void incializarSuperblock() {
     free(rutaSuperBlock);
 }
 
-void incializarHashMap() {
+void incializarHashMap(bool crearVacio) {
     // Ruta del índice de hashes bajo el punto de montaje
     char* ruta = string_duplicate(configStorage->punto_montaje);
     // Aseguro separador
@@ -65,7 +65,7 @@ void incializarHashMap() {
     string_append(&ruta, "blocks_hash_index.config");
 
     // Si existe, lo abro. Si no, lo creo vacío y lo abro.
-    if (archivoExiste(ruta)) {
+    if (archivoExiste(ruta) && !crearVacio) {
         hashMap = config_create(ruta);
         if (hashMap == NULL) {
             log_error(loggerStorage, "blocks_hash_index.config existe pero no pudo leerse. Re-creando vacío.");

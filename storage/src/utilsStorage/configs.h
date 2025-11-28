@@ -64,10 +64,12 @@ char* estadoToString(t_estado_fileTag estado);
 /**
  * @brief Inicializa el índice de hashes (blocks_hash_index.config) y asigna hashMap.
  * 
+ * @param crearVacio Indica si se debe crear un índice vacío (true) o abrir el existente (false).
+ * 
  * Esta función se encarga de crear o abrir el archivo de índice de hashes
  * y asignar el puntero global hashMap para su uso.
  */
-void incializarHashMap();
+void incializarHashMap(bool crearVacio);
 
 void inicializarConfigStorage(char* archivoConfiguracion);
 
