@@ -3,16 +3,15 @@
 void* recibirCliente(void* cliente);
 
 int main(int argc, char* argv[]) { 
-    if (argc < 2) {
-      fprintf(stderr, "Uso: %s <archivo_configuracion>\n", argv[0]);
-      return 1;
-    }
+  if (argc < 2) {
+    fprintf(stderr, "Uso: %s <archivo_configuracion>\n", argv[0]);
+    return 1;
+  }
 
-    char* archivoConfiguracion = argv[1]; 
-    printf("Intentando cargar el archivo de configuración: %s\n", archivoConfiguracion);
-    
-    inicializarConfigStorage(archivoConfiguracion);
-    inicializarFS(archivoConfiguracion);
-    iniciarServidor();
-    return 0;
+  char* archivoConfiguracion = argv[1]; 
+  
+  inicializarConfigStorage(archivoConfiguracion);
+  inicializarFS(archivoConfiguracion);
+  iniciarServidor();
+  return 0;
 }

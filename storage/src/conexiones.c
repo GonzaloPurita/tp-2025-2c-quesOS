@@ -35,6 +35,8 @@ void recibirCliente(void* cliente) {
 
     t_list* datosRecibidos = NULL;
     t_paquete* datosEnviados = NULL;
+    char* idWorker = NULL;
+
 
     while(1) {
         op_code cod = recibir_operacion(socket_cliente);
@@ -77,6 +79,25 @@ void recibirCliente(void* cliente) {
                 usleep(configStorage->retardo_acceso_bloque * 1000); // Simulo retardo de acceso a bloque
                 readBloqueLogico(datosRecibidos, socket_cliente);
                 break;
+            }
+            case ID_WORKER: {
+                agregarWorker();
+                if(list_size(datosRecibidos) > 0) {
+                    idWorker = list_get(datosRecibidos, 0);
+                    log_info(loggerStorage, "Worker con ID %s conectado. Total Workers: %d", idWorker, numeroWorkers);
+                } else {
+                    log_info(loggerStorage, "Worker conectado. Total Workers: %d", numeroWorkers);
+                }
+            }
+            case -1: {
+                // “##Se desconecta el Worker <WORKER_ID> - Cantidad de Workers: <CANTIDAD>”
+                eliminarWorker();
+                if (idWorker != NULL) {
+                    log_info(loggerStorage, "##Se desconecta el Worker %s - Cantidad de Workers: %d", idWorker, numeroWorkers);
+                } else {
+                    log_info(loggerStorage, "##Se desconecta un Worker - Cantidad de Workers: %d", numeroWorkers);
+                }
+                return;
             }
             default:
                 log_error(loggerStorage, "Operacion desconocida. No se puede atender al cliente.");

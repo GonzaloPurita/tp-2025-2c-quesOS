@@ -1,5 +1,10 @@
 #define _XOPEN_SOURCE 500
 #include "auxiliares.h"
+#include <pthread.h>
+#include <semaphore.h>
+
+int numeroWorkers = 0;
+pthread_mutex_t mutex_numeroWorkers = PTHREAD_MUTEX_INITIALIZER;
 
 // Función para eliminar un archivo o directorio
 int eliminar(const char* path, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
@@ -89,4 +94,18 @@ void imprimirLista(char** lista) {
     } else {
         printf("La lista es NULL\n");
     }
+}
+
+void agregarWorker() {
+    pthread_mutex_lock(&mutex_numeroWorkers);
+    numeroWorkers++;
+    pthread_mutex_unlock(&mutex_numeroWorkers);
+}
+
+void eliminarWorker() {
+    pthread_mutex_lock(&mutex_numeroWorkers);
+    if (numeroWorkers > 0) {
+        numeroWorkers--;
+    }
+    pthread_mutex_unlock(&mutex_numeroWorkers);
 }

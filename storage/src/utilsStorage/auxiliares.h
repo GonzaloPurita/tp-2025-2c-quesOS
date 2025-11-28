@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include "configs.h"
 
+extern int numeroWorkers;
+
 /**
  * @brief Borra un archivo o directorio en la ruta especificada.
  *
@@ -70,5 +72,15 @@ int pasarABloques(int bytes);
  * @param lista Lista de cadenas de caracteres a imprimir. La lista debe estar terminada con un puntero NULL.
  */
 void imprimirLista(char** lista);
+
+/**
+ * @brief Incrementa el contador de workers de manera segura.
+ */
+void agregarWorker();
+
+/**
+ * @brief Decrementa el contador de workers de manera segura.
+ */
+void eliminarWorker();
 
 #endif

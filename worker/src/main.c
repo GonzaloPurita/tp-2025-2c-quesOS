@@ -7,6 +7,12 @@ int main(int argc, char* argv[]) {
     // --- Conexión a Storage ---
     char* puertoStorage = string_itoa(configWorker->puerto_storage);
     conexionStorage = crearConexionCliente(configWorker->ip_storage, puertoStorage);
+    t_paquete* paquete = crear_paquete();
+    paquete->codigo_operacion = ID_WORKER;
+    agregar_a_paquete(paquete, id, strlen(id)+1);
+    enviar_paquete(paquete, conexionStorage);
+    eliminar_paquete(paquete);
+    
     free(puertoStorage);
     log_info(loggerWorker, "la conexion con storage es: %d", conexionStorage);
     pedir_tamanio_de_bloque(); // llega el TAM_BLOQUE (global)
