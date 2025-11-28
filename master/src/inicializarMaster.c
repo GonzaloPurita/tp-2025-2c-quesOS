@@ -15,8 +15,8 @@ void iniciarConexionesMaster() {
     workers_iniciar();
     planificador_lanzar();
 
-    log_info(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
-    log_info(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);
+    log_debug(loggerMaster, "Master escuchando en puerto %d", configMaster->puerto_escucha);
+    log_debug(loggerMaster, "server_fd_master inicializado con valor: %d", server_fd_master);
 
     pthread_t hilo_conexiones;
     int result = pthread_create(&hilo_conexiones, NULL, recibirConexiones, NULL);
@@ -34,11 +34,11 @@ void cerrarConexionesMaster() {
 
 void* recibirConexiones(void* arg) {
     while (1) {
-        log_info(loggerMaster, "Esperando nuevas conexiones...");
+        log_debug(loggerMaster, "Esperando nuevas conexiones...");
         int cliente_fd = esperarCliente(server_fd_master);
         int* fd_ptr = malloc(sizeof(int));
         *fd_ptr = cliente_fd;
-        log_info(loggerMaster, "Nueva conexión entrante en fd=%d", cliente_fd);
+        log_debug(loggerMaster, "Nueva conexión entrante en fd=%d", cliente_fd);
 
         pthread_t hilo;
         pthread_create(&hilo, NULL, (void*) atenderCliente, fd_ptr);
@@ -53,7 +53,7 @@ void* atenderCliente(void* arg) {
     free(arg);
     
     op_code cod = recibir_operacion(fd);
-    log_info(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
+    log_debug(loggerMaster, "Nueva conexión entrante en fd=%d con op_code=%d", fd, cod);
 
     switch (cod) {
         case ID_WORKER: {
@@ -84,7 +84,6 @@ void* atenderCliente(void* arg) {
         
             list_destroy_and_destroy_elements(datos, free);
         
-            log_info(loggerMaster, "Worker ID=%s conectado en fd=%d", worker_id, fd);
         
             if (!worker_registrar(worker_id, fd)) {
                 log_error(loggerMaster, "No se pudo registrar worker %s en fd=%d", worker_id, fd);

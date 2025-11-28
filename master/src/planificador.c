@@ -15,7 +15,7 @@ void planificador_lanzar(void) {
     pthread_t th_planificador;
     pthread_create(&th_planificador, NULL, planificador, NULL);
     pthread_detach(th_planificador);
-    log_info(loggerMaster, "Hilo planificador iniciado");
+    log_debug(loggerMaster, "Hilo planificador iniciado");
 }
 
 void planificarConDesalojoYAging() {

@@ -63,8 +63,6 @@ int worker_registrar(char* id, int fd) {
     int list_size_now = list_size(LISTA_WORKERS);
     pthread_mutex_unlock(&mutex_workers);
 
-    if (loggerMaster) log_info(loggerMaster, "Worker %s registrado (fd=%d). Lista size=%d", id_copy, fd, list_size_now);
-
     return 1;
 }
 
@@ -215,7 +213,6 @@ void* atenderWorker(void* arg){
         
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
-            log_info(loggerMaster, "LLEGO UN RTA_DESALOJO DEL WORKER");
             t_list* p = recibir_paquete(fd);
             if (!p || list_size(p) < 2) {
                 log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
