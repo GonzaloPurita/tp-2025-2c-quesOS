@@ -45,17 +45,14 @@ void recibirCliente(void* cliente) {
             case TAMANIO_BLOQUE: {
                 datosEnviados = crearNuevoPaquete(TAMANIO_BLOQUE);
                 agregar_a_paquete(datosEnviados, &(superblock->blocksize), sizeof(int));
-                log_debug(loggerStorage, "Enviando paquete con Tamanio de bloque");
                 enviar_paquete(datosEnviados, socket_cliente);
                 break;
             }
             case OP_CREATE: {
-                log_debug(loggerStorage, "Ejecutando CREATE desde conexion");
                 crearFile(datosRecibidos, socket_cliente);
                 break;
             }
             case OP_TRUNCATE: {
-                log_debug(loggerStorage, "Ejecutando TRUNCATE desde conexion");
                 truncar(datosRecibidos, socket_cliente);
                 break;
             }
@@ -94,7 +91,7 @@ void recibirCliente(void* cliente) {
             list_destroy_and_destroy_elements(datosRecibidos, free);
             datosRecibidos = NULL;
         }
-        log_info(loggerStorage, "Operacion atendida correctamente.");
+        log_debug(loggerStorage, "Operacion atendida correctamente.");
     }
 }
 

@@ -2,7 +2,7 @@
 
 // Funciones privadas
 bool crearMetaData(char* path);
-bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico);
+bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico, int query_id);
 void free_wrapper(char* line);
 op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag);
 // Nueva función auxiliar para actualizar la metadata de BLOCKS
@@ -12,7 +12,7 @@ bool crearFileInicial() {
     if (!crearFileTag("initial_file", "BASE")) {
         return false;
     }
-    if (!agregarBloqueLogicoHL("initial_file", "BASE", 0, 0)) {
+    if (!agregarBloqueLogicoHL("initial_file", "BASE", 0, 0, 0)) {
         return false;
     }
     //completarBloque(); TODO: Averiguar a que se refiere.
@@ -130,7 +130,7 @@ char* rutaFileTag(char* nombreFile, char* nombreTag) {
     return ruta;
 }
 
-bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico) {
+bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int numeroBloqueFisico, int query_id) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
         log_error(loggerStorage, "Error agregando bloque lógico, el nombre del file o del tag es NULL");
@@ -152,15 +152,16 @@ bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLo
     string_append(&rutaBloqueLogico, nombreTag);
     string_append(&rutaBloqueLogico, "/logical_blocks/");
 
-    if(!crearHardlink(rutaBloqueLogico, numeroBloqueLogico, numeroBloqueFisico)) {
+    if(!crearHardlink(rutaBloqueLogico, numeroBloqueLogico, numeroBloqueFisico, query_id)) {
         free(rutaBloqueLogico);
         return false;
     }
 
+    log_info(loggerStorage, "##%d - %s:%s Se agregó el hard link del bloque lógico %d al bloque físico %d", query_id, nombreFile, nombreTag, numeroBloqueLogico, numeroBloqueFisico);
+
     free(rutaBloqueLogico);
 
     // Actualizo metadata BLOCKS en el índice correspondiente
-    log_debug(loggerStorage, "Actualizando metadata BLOCKS para %s:%s[%d] -> %d", nombreFile, nombreTag, numeroBloqueLogico, numeroBloqueFisico);
     if (!setBloqueEnMetadata(nombreFile, nombreTag, numeroBloqueLogico, numeroBloqueFisico)) {
         log_warning(loggerStorage, "No se pudo actualizar metadata BLOCKS para %s:%s[%d]", nombreFile, nombreTag, numeroBloqueLogico);
     }
@@ -168,7 +169,7 @@ bool agregarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLo
     return true;
 }
 
-bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico) {
+bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int query_id) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
         log_error(loggerStorage, "Error eliminando bloque lógico, el nombre del file o del tag es NULL");
@@ -196,7 +197,9 @@ bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueL
         return false;
     }
 
-    bool ok = eliminarHardlink(rutaBloqueLogico, numeroBloqueLogico, bloqueFisico);
+    log_info(loggerStorage, "##%d - %s:%s Se eliminó el hard link del bloque lógico %d al bloque físico %d", query_id, nombreFile, nombreTag, numeroBloqueLogico, bloqueFisico);
+
+    bool ok = eliminarHardlink(rutaBloqueLogico, numeroBloqueLogico, bloqueFisico, query_id);
     free(rutaBloqueLogico);
 
     // Pongo 0 en metadata para ese índice si salió bien
@@ -209,7 +212,7 @@ bool eliminarBloqueLogicoHL(char* nombreFile, char* nombreTag, int numeroBloqueL
     return ok;
 }
 
-bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico) {
+bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloqueFisico, int query_id) {
     // Validación de parámetros
     if (rutaBloqueLogico == NULL || numeroBloqueLogico < 0 || bloqueFisico < 0) {
         log_error(loggerStorage, "Parámetros inválidos en eliminarHardlink");
@@ -226,7 +229,7 @@ bool eliminarHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int bloque
     if (esHardlinkUnico(rutaBloqueLogicoTemp) && (bloqueFisico != 0)) {
         // Marco el bloque físico como libre en el bitmap
         bitarray_clean_bit(bitmap, bloqueFisico);
-        log_debug(loggerStorage, "Bloque físico %d marcado como libre", bloqueFisico);
+        log_info(loggerStorage, "##%d - Bloque Físico Liberado - Número de Bloque: %d", query_id, bloqueFisico);
     }
 
     // Elimino el hardlink
@@ -347,7 +350,6 @@ bool cambiarEstadoMetaData(char* file, char* tag, t_estado_fileTag estadoNuevo) 
 op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag) {
     // Trabajar sobre una copia para no invalidar el puntero original del caller
     char* rutaTag = string_duplicate(rutaBase);
-    log_debug(loggerStorage, "Nombre del TAG: %s", nombreTag);
     string_append(&rutaTag, "/");
     string_append(&rutaTag, nombreTag);
     if (crearDirectorio(rutaTag) == -1) { // Me genera la carpeta con el nombre del tag.
@@ -372,7 +374,7 @@ op_code crearDirectorioYMetaData(char* rutaBase, char* nombreTag) {
     return OP_SUCCESS;
 }
 
-op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico) {
+op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, int query_id) {
     int bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
     if (bloqueFisico == -1) {
         log_error(loggerStorage, "Error validando bloque lógico %d de %s:%s, no existe bloque físico asociado", numeroBloqueLogico, nombreFile, nombreTag);
@@ -394,22 +396,21 @@ op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueL
         
         // Verificar que no sea el mismo bloque físico (evitar reemplazo innecesario)
         if (nroBloqueConEseHash == bloqueFisico) {
-            log_debug(loggerStorage, "El bloque físico %d ya está en el hashMap, no se reemplaza", bloqueFisico);
             free(hash);
             return OP_SUCCESS;
         }
 
-        log_info(loggerStorage, "Hash duplicado encontrado: bloque %d -> bloque %d (hash: %s)", bloqueFisico, nroBloqueConEseHash, hash);
+        log_info(loggerStorage, "##%d - %s:%s Bloque Lógico %d se reasigna de %d a %d", query_id, nombreFile, nombreTag, numeroBloqueLogico, bloqueFisico, nroBloqueConEseHash);
         
         // Eliminar el hardlink antiguo (esto puede liberar el bloque si es único)
-        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico)) {
+        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, query_id)) {
             log_error(loggerStorage, "Error eliminando hardlink del bloque %d", bloqueFisico);
             free(hash);
             return OP_FAILED;
         }
         
         // Agregar hardlink al bloque con el mismo hash
-        if (!agregarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, nroBloqueConEseHash)) {
+        if (!agregarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, nroBloqueConEseHash, query_id)) {
             log_error(loggerStorage, "Error agregando hardlink al bloque %d", nroBloqueConEseHash);
             free(hash);
             return OP_FAILED;
@@ -479,7 +480,7 @@ static bool setBloqueEnMetadata(char* file, char* tag, int numeroBloqueLogico, i
     return true;
 }
 
-op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, char* tagDestino) {
+op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, char* tagDestino, int query_id) {
     // Validar que el tag origen exista
     t_config* metaDataOriginal = getMetaData(fileOrigen, tagOrigen);
     if(metaDataOriginal == NULL) {
@@ -491,7 +492,7 @@ op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, ch
     char** blocks = config_get_array_value(metaDataOriginal, "BLOCKS");
     int bloquesCount = 0;
     while(blocks[bloquesCount] != NULL) {
-        bool resultado = agregarBloqueLogicoHL(fileDestino, tagDestino, bloquesCount, atoi(blocks[bloquesCount]));
+        bool resultado = agregarBloqueLogicoHL(fileDestino, tagDestino, bloquesCount, atoi(blocks[bloquesCount]), query_id);
         if (!resultado) {
             log_error(loggerStorage, "Error al agregar bloque lógico %d al tag destino %s:%s", bloquesCount, fileDestino, tagDestino);
             string_array_destroy(blocks);
@@ -518,6 +519,5 @@ op_code duplicarFileTag(char* fileOrigen, char* tagOrigen, char* fileDestino, ch
     config_destroy(metaDataOriginal);
     config_destroy(metaDataDestino);
     
-    log_info(loggerStorage, "Tag %s:%s duplicado exitosamente a %s:%s", fileOrigen, tagOrigen, fileDestino, tagDestino);
     return OP_SUCCESS;
 }

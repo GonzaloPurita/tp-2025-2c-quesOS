@@ -2,30 +2,36 @@
 
 // Privados
 void enviarRespuesta(op_code codigo, int socket_cliente);
-void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int bytes, int socket_cliente);
-void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int bytes, int socket_cliente);
+void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int bytes, int socket_cliente, int query_id);
+void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int bytes, int socket_cliente, int query_id);
 int contarElementos(char** array);
 void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio, int bytes, int* bloquesFisicos);
-op_code borrarTag(char* nombreFile, char* nombreTag);
-op_code commitTag(char* nombreFile, char* nombreTag);
-op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido);
+op_code borrarTag(char* nombreFile, char* nombreTag, int query_id);
+op_code commitTag(char* nombreFile, char* nombreTag, int query_id);
+op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* contenido, size_t sizeContenido, int query_id);
 void logearResultadoOP(op_code resultado, char* operacion);
-op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t);
+op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t, int query_id);
 
 void crearFile(t_list* data, int socket_cliente) {
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFile = list_get(data, 1);
+    char* nombreTag = list_get(data, 2);
     op_code resultado = crearFileTag(nombreFile, nombreTag);
+    
+    if (resultado == OP_SUCCESS) {
+        log_info(loggerStorage, "##%d - File Creado %s:%s", query_id, nombreFile, nombreTag);
+    }
+    
     enviarRespuesta(resultado, socket_cliente);
     logearResultadoOP(resultado, "Crear FILE");
 }
 
 void truncar(t_list* data, int socket_cliente) {
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
-    int bytes = *((int*) list_get(data, 2));
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFile = list_get(data, 1);
+    char* nombreTag = list_get(data, 2);
+    int bytes = *((int*) list_get(data, 3));
     int nuevoTamanio = pasarABloques(bytes);
-    log_debug(loggerStorage, "Truncar file tag %s:%s a tamaño %d", nombreFile, nombreTag, nuevoTamanio);
 
     t_config* metadata = getMetaData(nombreFile, nombreTag);
 
@@ -46,70 +52,74 @@ void truncar(t_list* data, int socket_cliente) {
     int bloquesActuales = contarElementos(blocks);
 
     if(bloquesActuales == nuevoTamanio){
+        log_info(loggerStorage, "##%d - File Truncado %s:%s - Tamaño: %d", query_id, nombreFile, nombreTag, bytes);
         enviarRespuesta(OP_SUCCESS, socket_cliente);
         logearResultadoOP(OP_SUCCESS, "TRUNCAR");
     }
     else if(bloquesActuales < nuevoTamanio){
-        agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, bytes, socket_cliente);
+        agrandarFileTag(nombreFile, nombreTag, nuevoTamanio, bloquesActuales, metadata, blocks, bytes, socket_cliente, query_id);
     }
     else{
-        reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, blocks, bytes, socket_cliente);   
+        reducirFileTag(nombreFile, nombreTag, bloquesActuales, nuevoTamanio, metadata, blocks, bytes, socket_cliente, query_id);   
     }
     string_array_destroy(blocks);
     config_destroy(metadata);
 }
 
 void tag(t_list* data, int socket_cliente) {
-    if(list_size(data) != 4) {
-        log_error(loggerStorage, "Me llegaron mas/menos datos de los que esperaba (4).");
+    if(list_size(data) != 5) {
+        log_error(loggerStorage, "Me llegaron mas/menos datos de los que esperaba (5).");
         return;
     }
-    char* nombreFileOriginal = list_get(data, 0);
-    char* nombreTagOriginal = list_get(data, 1);
-    char* nombreFile = list_get(data, 2);
-    char* nombreTag = list_get(data, 3);
-    op_code resultado = opTag(nombreFileOriginal, nombreTagOriginal, nombreFile, nombreTag);
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFileOriginal = list_get(data, 1);
+    char* nombreTagOriginal = list_get(data, 2);
+    char* nombreFile = list_get(data, 3);
+    char* nombreTag = list_get(data, 4);
+    op_code resultado = opTag(nombreFileOriginal, nombreTagOriginal, nombreFile, nombreTag, query_id);
     enviarRespuesta(resultado, socket_cliente);
 
     logearResultadoOP(resultado, "Crear TAG");
 }
 
 void eliminarTag(t_list* data, int socket_cliente) {
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
-    op_code resultado = borrarTag(nombreFile, nombreTag);
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFile = list_get(data, 1);
+    char* nombreTag = list_get(data, 2);
+    op_code resultado = borrarTag(nombreFile, nombreTag, query_id);
     enviarRespuesta(resultado, socket_cliente);
 
     logearResultadoOP(resultado, "Eliminar TAG");
 }
 
 void commit(t_list* data, int socket_cliente) {
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
-    op_code resultado = commitTag(nombreFile, nombreTag);
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFile = list_get(data, 1);
+    char* nombreTag = list_get(data, 2);
+    op_code resultado = commitTag(nombreFile, nombreTag, query_id);
     enviarRespuesta(resultado, socket_cliente);
     logearResultadoOP(resultado, "COMMIT");
 }
 
 void writeFileTag(t_list* data, int socket_cliente) {
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
-    int nroBloqueLogico = *((int*) list_get(data, 2));
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFile = list_get(data, 1);
+    char* nombreTag = list_get(data, 2);
+    int nroBloqueLogico = *((int*) list_get(data, 3));
 
-    log_info(loggerStorage, "DEBUG WRITE: File=%s Tag=%s BloqueLogico=%d", nombreFile, nombreTag, nroBloqueLogico);
-
-    void* contenido = list_get(data, 3);
-    int sizeContenido = *((int*) list_get(data, 4));
-    op_code resultado = escribirBloqueLogico(nombreFile, nombreTag, nroBloqueLogico, contenido, sizeContenido);
+    void* contenido = list_get(data, 4);
+    int sizeContenido = *((int*) list_get(data, 5));
+    op_code resultado = escribirBloqueLogico(nombreFile, nombreTag, nroBloqueLogico, contenido, sizeContenido, query_id);
     enviarRespuesta(resultado, socket_cliente);
 
     logearResultadoOP(resultado, "WRITE");
 }
 
 void readBloqueLogico(t_list* data, int socket_cliente) {
-    char* nombreFile = list_get(data, 0);
-    char* nombreTag = list_get(data, 1);
-    int nroBloqueLogico = *((int*) list_get(data, 2));
+    int query_id = *((int*) list_get(data, 0));
+    char* nombreFile = list_get(data, 1);
+    char* nombreTag = list_get(data, 2);
+    int nroBloqueLogico = *((int*) list_get(data, 3));
 
     t_config *metadata = getMetaData(nombreFile, nombreTag);
     if (metadata == NULL) {
@@ -129,10 +139,11 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
         return;
     }
 
+    log_info(loggerStorage, "##%d - Bloque Lógico Leído %s:%s - Número de Bloque: %d", query_id, nombreFile, nombreTag, nroBloqueLogico);
+
     t_paquete* paqueteRespuesta = crear_paquete();
     paqueteRespuesta->codigo_operacion = OP_SUCCESS;
     agregar_a_paquete(paqueteRespuesta, datos, superblock->blocksize);
-    log_debug(loggerStorage, "Enviando paquete EXITOSO - READ");
     enviar_paquete(paqueteRespuesta, socket_cliente);
     eliminar_paquete(paqueteRespuesta);
     free(datos);
@@ -141,19 +152,17 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
 // Privados - Implementaciones
 void enviarRespuesta(op_code codigo, int socket_cliente) {
     t_paquete* paqueteRespuesta = crear_paquete();
-    log_debug(loggerStorage, "Enviando un paquete con codigo %d", codigo);
     paqueteRespuesta->codigo_operacion = codigo;
     enviar_paquete(paqueteRespuesta, socket_cliente);
     eliminar_paquete(paqueteRespuesta);
 }
 
-void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int bytes, int socket_cliente) {
+void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bloquesActuales, t_config* metadata, char** blocks, int bytes, int socket_cliente, int query_id) {
     int i = bloquesActuales;
     bool error = false;
 
-    log_debug(loggerStorage, "bloquesActuales: %d, nuevoTamanio: %d", bloquesActuales, nuevoTamanio);
     for (; i < nuevoTamanio; i++) {
-        if (!agregarBloqueLogicoHL(nombreFile, nombreTag, i, 0)) {
+        if (!agregarBloqueLogicoHL(nombreFile, nombreTag, i, 0, query_id)) {
             error = true;
             break;
         }
@@ -161,7 +170,7 @@ void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bl
 
     if (error) {
         for (int j = bloquesActuales; j < i; j++) {
-            eliminarBloqueLogicoHL(nombreFile, nombreTag, j);
+            eliminarBloqueLogicoHL(nombreFile, nombreTag, j, query_id);
         }
         enviarRespuesta(OP_FAILED, socket_cliente);
     } else {
@@ -176,16 +185,17 @@ void agrandarFileTag(char* nombreFile, char* nombreTag, int nuevoTamanio, int bl
         }
         actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bytes, bloquesFisicos);
         free(bloquesFisicos);
+        log_info(loggerStorage, "##%d - File Truncado %s:%s - Tamaño: %d", query_id, nombreFile, nombreTag, bytes);
         enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
 }
 
-void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int bytes, int socket_cliente) {
+void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int nuevoTamanio, t_config* metadata, char** blocks, int bytes, int socket_cliente, int query_id) {
     int i;
     bool error = false;
 
     for (i = bloquesActuales - 1; i >= nuevoTamanio; i--) {
-        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, i)) {
+        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, i, query_id)) {
             error = true;
             break;
         }
@@ -206,6 +216,7 @@ void reducirFileTag(char* nombreFile, char* nombreTag, int bloquesActuales, int 
         }
         actualizarBloques(metadata, bloquesActuales, nuevoTamanio, bytes, bloquesFisicos);
         free(bloquesFisicos);
+        log_info(loggerStorage, "##%d - File Truncado %s:%s - Tamaño: %d", query_id, nombreFile, nombreTag, bytes);
         enviarRespuesta(OP_SUCCESS, socket_cliente);
     }
 }
@@ -251,7 +262,7 @@ void actualizarBloques(t_config* metadata, int bloquesActuales, int nuevoTamanio
     free(bytesStr);
 }
 
-op_code borrarTag(char* nombreFile, char* nombreTag) {
+op_code borrarTag(char* nombreFile, char* nombreTag, int query_id) {
     t_config* metadata = getMetaData(nombreFile, nombreTag);
     if (metadata == NULL) {
         return ERROR_FILE_NOT_FOUND;
@@ -262,7 +273,7 @@ op_code borrarTag(char* nombreFile, char* nombreTag) {
 
     // Eliminar todos los bloques lógicos asociados
     for (int i = 0; i < bloquesActuales; i++) {
-        eliminarBloqueLogicoHL(nombreFile, nombreTag, i);
+        eliminarBloqueLogicoHL(nombreFile, nombreTag, i, query_id);
     }
 
     // Eliminar el FileTag
@@ -272,10 +283,12 @@ op_code borrarTag(char* nombreFile, char* nombreTag) {
     free(pathTag);
     string_array_destroy(blocks);
 
+    log_info(loggerStorage, "##%d - Tag Eliminado %s:%s", query_id, nombreFile, nombreTag);
+
     return OP_SUCCESS;
 }
 
-op_code commitTag(char* nombreFile, char* nombreTag) {
+op_code commitTag(char* nombreFile, char* nombreTag, int query_id) {
     t_config* metadata = getMetaData(nombreFile, nombreTag);
     if (metadata == NULL) {
         return ERROR_FILE_NOT_FOUND;
@@ -286,7 +299,7 @@ op_code commitTag(char* nombreFile, char* nombreTag) {
     int bloquesActuales = contarElementos(blocks);
 
     for (int i = 0; i < bloquesActuales; i++) {
-        op_code resultado = validarBloqueLogico(nombreFile, nombreTag, i);
+        op_code resultado = validarBloqueLogico(nombreFile, nombreTag, i, query_id);
         if (resultado != OP_SUCCESS) {
             return resultado;
         }
@@ -297,10 +310,12 @@ op_code commitTag(char* nombreFile, char* nombreTag) {
     config_save(metadata);
     config_destroy(metadata);
 
+    log_info(loggerStorage, "##%d - Commit de File:Tag %s:%s", query_id, nombreFile, nombreTag);
+
     return OP_SUCCESS;
 }
 
-op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* datos, size_t sizeDatos) {
+op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueLogico, void* datos, size_t sizeDatos, int query_id) {
     // Validación de datos
     if (nombreFile == NULL || nombreTag == NULL) {
         log_error(loggerStorage, "Error escribiendo bloque lógico, el nombre del file o del tag es NULL");
@@ -348,25 +363,25 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
 
     int bloqueFisico;
     if(esHardlinkUnico(pathBloqueLogico)) { // Como es HL unico, puedo escribir directamente en el bloque fisico
-        log_debug(loggerStorage, "DEBUG: Hardlink único para %s", pathBloqueLogico);
+        log_debug(loggerStorage, "Hardlink único para %s", pathBloqueLogico);
         bloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, numeroBloqueLogico);
     } else {
         // El bloque tiene mas de un Hardlink -> Le asigno uno nuevo
-        log_debug(loggerStorage, "DEBUG: Hardlink múltiple para %s", pathBloqueLogico);
-        bloqueFisico = obtenerBloqueLibre();
+        log_debug(loggerStorage, "Hardlink múltiple para %s", pathBloqueLogico);
+        bloqueFisico = obtenerBloqueLibre(query_id);
         if (bloqueFisico == -1) {
             free(pathBloqueLogico);
             free(pathFolder);
             config_destroy(metadata);
             return ERROR_NO_SPACE;
         }
-        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico)) {
+        if (!eliminarBloqueLogicoHL(nombreFile, nombreTag, numeroBloqueLogico, query_id)) {
             free(pathBloqueLogico);
             free(pathFolder);
             config_destroy(metadata);
             return OP_FAILED;
         }
-        if (!crearHardlink(pathFolder, numeroBloqueLogico, bloqueFisico)) {
+        if (!crearHardlink(pathFolder, numeroBloqueLogico, bloqueFisico, query_id)) {
             free(pathBloqueLogico);
             free(pathFolder);
             config_destroy(metadata);
@@ -379,9 +394,8 @@ op_code escribirBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloque
             return OP_FAILED;
         }
     }
-    log_info(loggerStorage, "DEBUG: Escribiendo en Bloque Fisico Asignado: %d", bloqueFisico);
-    if(escribirBloqueFisico(bloqueFisico, datos, sizeDatos, false)) {
-
+    if(escribirBloqueFisico(bloqueFisico, datos, sizeDatos, false, query_id)) {
+        log_info(loggerStorage, "##%d - Bloque Lógico Escrito %s:%s - Número de Bloque: %d", query_id, nombreFile, nombreTag, numeroBloqueLogico);
         free(pathBloqueLogico);
         free(pathFolder);
         config_destroy(metadata);
@@ -402,7 +416,7 @@ void logearResultadoOP(op_code resultado, char* operacion) {
     }
 }
 
-op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t) {
+op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t, int query_id) {
     // Validar que el tag destino no exista
     t_config* metaDataDestino = getMetaData(f, t);
     if (metaDataDestino != NULL) {
@@ -417,11 +431,13 @@ op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t) {
         return rtaCrear;
     }
 
+    log_info(loggerStorage, "##%d - Tag creado %s:%s", query_id, f, t);
+
     // Duplicar el contenido del tag origen al tag destino
-    op_code rtaDuplicar = duplicarFileTag(fOriginal, tOriginal, f, t);
+    op_code rtaDuplicar = duplicarFileTag(fOriginal, tOriginal, f, t, query_id);
     if (rtaDuplicar != OP_SUCCESS) {
         // Rollback: eliminar el tag destino que se creó
-        borrarTag(f, t);
+        borrarTag(f, t, query_id);
     }
     return rtaDuplicar;
 }

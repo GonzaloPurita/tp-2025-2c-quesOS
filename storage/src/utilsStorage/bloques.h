@@ -45,9 +45,10 @@ bool bloqueFisicoValido(int numeroBloqueFisico);
  * @param sizeDatos Tamaño de los datos a escribir.
  * @param agregar Indica si los datos deben agregarse al contenido existente (true) 
  *                o sobrescribirlo (false).
+ * @param query_id ID de la query que realiza la operación.
  * @return true si la operación fue exitosa, false en caso de error.
  */
-bool escribirBloqueFisico(int numeroBloqueFisico, void* datos, size_t sizeDatos, bool agregar);
+bool escribirBloqueFisico(int numeroBloqueFisico, void* datos, size_t sizeDatos, bool agregar, int query_id);
 
 /**
  * @brief Escribe el bloque inicial del sistema de almacenamiento.
@@ -87,16 +88,18 @@ void cargarBitmap();
  * @param rutaBloqueLogico Ruta de la carpeta de logical_blocks de ese File-Tag.
  * @param numeroBloqueLogico Número del bloque lógico.
  * @param numeroBloqueFisico Número del bloque físico al que se enlazará.
+ * @param query_id ID de la query que realiza la operación.
  * @return true si el hardlink fue creado exitosamente, false en caso de error.
  */
-bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico);
+bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico, int query_id);
 
 /**
  * @brief Obtiene un bloque físico libre y lo marca como usado en el bitmap.
  * 
+ * @param query_id ID de la query que realiza la operación.
  * @return El número del bloque físico libre, o -1 si no hay bloques libres disponibles.
  */
-int obtenerBloqueLibre();
+int obtenerBloqueLibre(int query_id);
 
 /**
  * @brief Cuenta la cantidad de hardlinks asociados a un archivo.

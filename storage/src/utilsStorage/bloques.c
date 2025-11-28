@@ -47,12 +47,12 @@ bool escribirBloqueInicial() {
         return false;
     }
     memset(datos, 0, superblock->blocksize);
-    bool resultado = escribirBloqueFisico(0, datos, superblock->blocksize, false);
+    bool resultado = escribirBloqueFisico(0, datos, superblock->blocksize, false, 0);
     free(datos);
     return resultado;
 }
 
-bool escribirBloqueFisico(int numeroBloqueFisico, void* datos, size_t sizeDatos, bool agregar) {
+bool escribirBloqueFisico(int numeroBloqueFisico, void* datos, size_t sizeDatos, bool agregar, int query_id) {
     if (datos == NULL) return false;
     if (!bloqueFisicoValido(numeroBloqueFisico)) return false;
 
@@ -154,7 +154,7 @@ void cargarBitmap() {
 
 // Bloques lógicos
 
-bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico) {
+bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBloqueFisico, int query_id) {
     // Validación de datos
     if (rutaBloqueLogico == NULL) {
         log_error(loggerStorage, "Error creando hard link, la ruta del bloque lógico es NULL");
@@ -193,10 +193,11 @@ bool crearHardlink(char* rutaBloqueLogico, int numeroBloqueLogico, int numeroBlo
     return true;
 }
 
-int obtenerBloqueLibre() {
+int obtenerBloqueLibre(int query_id) {
     for (int i = 0; i < superblock->nroBloques; i++) {
         if (!bitarray_test_bit(bitmap, i)) { // Si el bit está en 0, está libre
             bitarray_set_bit(bitmap, i); // Marco el bloque como usado
+            log_info(loggerStorage, "##%d - Bloque Físico Reservado - Número de Bloque: %d", query_id, i);
             return i;
         }
     }

@@ -33,7 +33,6 @@ int crearDirectorio(const char* path) {
         log_error(loggerStorage, "Error creando el directorio, el path es NULL");
         return -1;
     }
-    log_debug(loggerStorage, "Creando directorio en la ruta: %s", path);
     int resultado = mkdir(path, 0700); // Permisos de solo lectura, escritura y ejecución para el propietario
     if (resultado == -1) {
         log_error(loggerStorage, "Error creando el directorio, para el path: %s", path);
