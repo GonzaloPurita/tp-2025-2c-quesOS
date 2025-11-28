@@ -292,13 +292,17 @@ void* atenderWorker(void* arg){
             sem_post(&sem_workers_disponibles);
 
             // 6) Enviar respuesta al Query Control
-            t_paquete* r = crear_paquete();
-            r->codigo_operacion = QUERY_FINALIZADA;
-            agregar_a_paquete(r, &qid, sizeof(int));
-            enviar_paquete(r, fd_qc);
-            eliminar_paquete(r);
-            log_info(loggerMaster, "## Se terminó la Query <%d> en el Worker <%s>", qid, id);
-            return NULL;
+                t_paquete* r = crear_paquete();
+                r->codigo_operacion = QUERY_FINALIZADA;
+                agregar_a_paquete(r, &qid, sizeof(int));
+                char* motivo = "EXITO";
+                agregar_a_paquete(r, motivo, strlen(motivo) + 1);
+                enviar_paquete(r, fd_qc);
+                eliminar_paquete(r);
+                
+                log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
+
+            return NULL; //SI TERMINO LA QUERY, DEJO DE ATENDER AL WORKER, CUANDO REPLANIFICO CREO EL HILO OTRA VEZ
         }
         case OP_READ: {
             // payload desde Worker: [qid:int][n:int][bytes:n][tag:char*]
