@@ -90,11 +90,13 @@ bool escribirBloqueFisico(int numeroBloqueFisico, char* datos, size_t sizeDatos,
 char* rutaBloqueFisico(int nroBloqueFisico) {
     // Genero la ruta del bloque físico
     char* nombre = crearNombreBloque(nroBloqueFisico);
+    char* rutaBase = rutaCompleta("/physical_blocks");
     char* rutaBloque = string_new();
-    string_append(&rutaBloque, rutaCompleta("/physical_blocks"));
+    string_append(&rutaBloque, rutaBase);
     string_append(&rutaBloque, "/");
     string_append(&rutaBloque, nombre);
     free(nombre);
+    free(rutaBase);  // Libero el string temporal
     return rutaBloque;    
 }
 
@@ -298,10 +300,11 @@ bool actualizarBloqueFileTag(t_config* metadata, int nroBloqueLogico, int nroBlo
     if (nroBloqueLogico >= len) {
         log_error(loggerStorage, "Error actualizando bloque en metadata, el número de bloque lógico %d está fuera de los límites (tamaño actual: %d)", nroBloqueLogico, len);
         string_array_destroy(bloques);
-        free(bloques);
         return false;
     }
 
+    // Liberar el valor anterior antes de sobrescribirlo
+    free(bloques[nroBloqueLogico]);
     // Actualizar el bloque lógico con el nuevo bloque físico
     bloques[nroBloqueLogico] = string_itoa(nroBloqueFisico);
 
