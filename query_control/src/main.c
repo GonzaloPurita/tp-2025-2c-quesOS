@@ -15,10 +15,11 @@ int main(int argc, char* argv[]) {
     
     log_info(loggerQueryControl, "## Conexión al Master exitosa. IP: %s, Puerto: %d",
              configQueryControl->ip_master, configQueryControl->puerto_master);
-
-    int conexion = crearConexionCliente(configQueryControl->ip_master, string_itoa(configQueryControl->puerto_master));
+    
+    char* puertoMaster = string_itoa(configQueryControl->puerto_master);
+    int conexion = crearConexionCliente(configQueryControl->ip_master, puertoMaster);
     log_debug(loggerQueryControl, "Conectado al Master en %s:%d", configQueryControl->ip_master, configQueryControl->puerto_master);
-
+    free(puertoMaster);
     int strlen_path = strlen(path_query);
 
     t_paquete* paquete = crear_paquete();
