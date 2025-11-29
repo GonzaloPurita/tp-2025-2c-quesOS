@@ -104,7 +104,7 @@ void* correr_query_en_hilo(void* arg) {
 
         case QUERY_ERROR:
             log_error(loggerWorker, "## Query %d: Finalizada por error", q_id);
-            // TODO: Hay que notificar al Master que hubo error?
+            notificar_error_a_master("Error de ejecución");
             break;
     }
 
@@ -714,7 +714,7 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
 void notificar_error_a_master(char* motivo) {
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_ERROR;
-    
+
     // envio id query
     agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     // el motivo seria como un string

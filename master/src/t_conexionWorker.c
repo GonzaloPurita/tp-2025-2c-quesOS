@@ -210,7 +210,10 @@ void* atenderWorker(void* arg){
   int fd = conexionWorker ->fd;
   char* id = conexionWorker ->id;
   while (1) {
-      sem_wait(&esperarQuery);
+    if(conexionWorker ->qid_actual == -1){
+        sem_wait(&esperarQuery);
+    }
+      
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
         worker_desconectar_por_fd(fd);
@@ -252,7 +255,7 @@ void* atenderWorker(void* arg){
 
             // 2) Despertar al hilo desalojar() para que envíe la nueva query
             sem_post(&conexionWorker->semaforo);
-            return NULL;
+            break;
         }
         case OP_END: {
             // 1) Recibir el paquete del Worker
