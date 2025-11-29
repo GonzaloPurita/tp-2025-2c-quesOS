@@ -312,7 +312,7 @@ void* atenderWorker(void* arg){
                 
                 log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
 
-            return NULL; //SI TERMINO LA QUERY, DEJO DE ATENDER AL WORKER, CUANDO REPLANIFICO CREO EL HILO OTRA VEZ
+            break; //SI TERMINO LA QUERY, DEJO DE ATENDER AL WORKER, CUANDO REPLANIFICO CREO EL HILO OTRA VEZ
         }
         case OP_READ: {
             // payload desde Worker: [qid:int][n:int][bytes:n][tag:char*]

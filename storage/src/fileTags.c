@@ -32,6 +32,12 @@ op_code crearFileTag(char* nombreFile, char* nombreTag) {
         log_error(loggerStorage, "Error creando file tag, el nombre del file o del tag está vacío");
         return OP_FAILED;
     }
+    t_config* metadata = getMetaData(nombreFile, nombreTag);
+    if (metadata != NULL) {
+        log_error(loggerStorage, "Error creando file tag, el file tag %s:%s ya existe", nombreFile, nombreTag);
+        config_destroy(metadata);
+        return ERROR_FILE_TAG_EXISTS;
+    }
 
     // Creamos la ruta files
     char* rutaFile = rutaCompleta("/files/");

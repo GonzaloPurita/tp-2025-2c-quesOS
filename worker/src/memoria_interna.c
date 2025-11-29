@@ -78,7 +78,7 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
             bytes_restantes -= bytes_a_usar;
             posicion_buffer += bytes_a_usar;
             offset = 0;
-            continue; 
+            return NULL; 
         }
 
         int frame = entrada->indice_frame;

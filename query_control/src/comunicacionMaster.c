@@ -42,7 +42,7 @@ void escucharMaster(int conexionMaster){
                     break;
                 }
 
-                char* motivo = list_get(valores, 0);
+                char* motivo = list_get(valores, 1);
                 log_info(loggerQueryControl, "## Query Finalizada - %s", motivo);
                 list_destroy_and_destroy_elements(valores, free);
                 return; //terminamos de escuchar xq la query termino
