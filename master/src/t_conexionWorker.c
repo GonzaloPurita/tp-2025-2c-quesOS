@@ -139,7 +139,9 @@ void worker_desconectar_por_fd(int fd) {
 
     if (!w) return;
 
+    pthread_mutex_lock(&mutex_workers);
     int qid_en_ejecucion = w->qid_actual;  
+    pthread_mutex_unlock(&mutex_workers);
     w->conectado = false;
     close(fd);
 
@@ -190,7 +192,9 @@ void worker_desconectar_por_fd(int fd) {
         );
     }
 
+    pthread_mutex_lock(&mutex_workers);
     w->qid_actual = -1;
+    pthread_mutex_unlock(&mutex_workers);
 }
 
 t_conexionWorker* worker_por_fd(int fd) {
@@ -210,9 +214,13 @@ void* atenderWorker(void* arg){
   int fd = conexionWorker ->fd;
   char* id = conexionWorker ->id;
   while (1) {
-    if(conexionWorker ->qid_actual == -1){
+    pthread_mutex_lock(&mutex_workers);
+    bool libre = (conexionWorker->qid_actual == -1);
+    pthread_mutex_unlock(&mutex_workers);
+
+    if (libre) {
         sem_wait(&esperarQuery);
-    }
+}
       
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
@@ -389,7 +397,9 @@ void* atenderWorker(void* arg){
                 break;
             }
             
+            pthread_mutex_lock(&mutex_workers);
             int qid = conexionWorker->qid_actual;  // qid
+            pthread_mutex_unlock(&mutex_workers);
             char* motivo = (char*) list_get(p, 1);  // motivo
             
             log_error(loggerMaster, "## Query %d finalizada con ERROR en Worker %s - Motivo: %s", qid, id, motivo);
@@ -424,7 +434,9 @@ void* atenderWorker(void* arg){
             pthread_mutex_unlock(&mutex_cola_exit);
             
             // marco libre al worker
+            pthread_mutex_lock(&mutex_workers);
             conexionWorker->qid_actual = -1;
+            pthread_mutex_unlock(&mutex_workers);
             log_debug(loggerMaster, "cantidad de workers disponibles: %d", workers_disponibles());
             
             

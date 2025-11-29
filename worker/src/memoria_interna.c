@@ -44,7 +44,7 @@ bool esta_en_memoria(t_formato* formato, int nro_pagina) {
 }
 
 char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
-    char* buffer = calloc(1, tamanio + 1); // el buffer arranca en 0, con un solo bloque de memoria, y con un tamaño
+    char* buffer = calloc(1, tamanio + 1);
 
     int pagina_inicio = direccion_base / TAM_PAGINA;
     int pagina_fin = (direccion_base + tamanio - 1) / TAM_PAGINA;
@@ -52,53 +52,58 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
     int bytes_restantes = tamanio;
     int posicion_buffer = 0;
 
+    // Obtener tabla (ya sabemos que existe porque ejecutar_read lo validó, pero por seguridad...)
     char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
     free(clave_tabla);
 
-    // Si no existe la tabla, retornamos buffer vacio (o podrías manejar error)
-    if (tabla == NULL) {
-        log_warning(loggerWorker, "Tabla de paginas no encontrada para lectura");
-        return buffer; 
+    if (!tabla) {
+        free(buffer);
+        return NULL;
     }
 
     for (int p = pagina_inicio; p <= pagina_fin; p++) {
         char* clave_pag = string_itoa(p);
         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
-        free(clave_pag);
-
+        
+        // --- FIX: AUTO-RECUPERACIÓN DE PÁGINA ---
+        // Si la página fue desalojada por una posterior en la misma instrucción, la traemos de vuelta.
         if (entrada == NULL || !entrada->presente || entrada->indice_frame == -1) {
-            log_warning(loggerWorker, "Intentando leer página %d no presente en RAM (Frame %d)", 
-                      p, (entrada ? entrada->indice_frame : -99));
-            // por ahora seguimos para no romper todo, pero podrimos abortar o rellenar con ceros
-            // si pasa esto es q 'pedir_pagina_a_storage' no se llamó antes.
+            log_warning(loggerWorker, "Page Fault dentro de READ (Thrashing): Recuperando Página %d", p);
             
-            // Avanzamos los contadores para que el bucle no se desincronice
-            int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
-            bytes_restantes -= bytes_a_usar;
-            posicion_buffer += bytes_a_usar;
-            offset = 0;
-            return NULL; 
+            // Llamamos a la función de carga (que ya tiene mutex y todo)
+            if (!pedir_pagina_a_storage(formato, p)) {
+                log_error(loggerWorker, "Error fatal recuperando página %d en lectura.", p);
+                free(clave_pag);
+                free(buffer);
+                return NULL; // O manejar error
+            }
+            
+            // Refrescamos la entrada porque el puntero viejo pudo cambiar o invalidarse
+            entrada = dictionary_get(tabla->paginas, clave_pag);
         }
+        // ----------------------------------------
+
+        free(clave_pag);
 
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
 
+        // Actualizamos política
         entrada->uso = true;
         frames[frame].uso = true;
-        frames[frame].timestamp = obtener_timestamp();
+        frames[frame].timestamp = obtener_timestamp(); 
 
-        int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset; // los bytes a usar van ser los que quedan o los que entran en la página
+        int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
 
+        // Simulamos acceso a RAM
         usleep(configWorker->retardo_memoria * 1000);
+        
         memcpy(buffer + posicion_buffer, MEMORIA + dir_fisica, bytes_a_usar);
-
-        log_info(loggerWorker, "Query %d: Acción: LEER - Dirección Física: %d - Valor: %s", 
-            query_actual->query_id, dir_fisica, buffer + posicion_buffer);
 
         bytes_restantes -= bytes_a_usar;
         posicion_buffer += bytes_a_usar;
-        offset = 0; // a partir de la segunda página empieza desde 0, porque antes tal vez arrancaba con la primer pagina empezada, pero ya la segunda si o si arranc de cero
+        offset = 0;
     }
 
     return buffer;  
@@ -236,7 +241,6 @@ int elegir_victima_CLOCKM() {
 bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     pthread_mutex_lock(&mutex_memoria);
 
-    // --- LOG OBLIGATORIO: MISS ---
     log_info(loggerWorker, "Query %d: - Memoria Miss - File: %s - Tag: %s - Pagina: %d", 
              query_actual->query_id, formato->file_name, formato->tag, nro_pagina);
 
@@ -261,7 +265,6 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     // 3. Desalojo (Swap Out)
     if (frames[marco].ocupado) {
         
-        // --- LOG OBLIGATORIO: LIBERACIÓN ---
         log_info(loggerWorker, "Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
                  query_actual->query_id, marco, frames[marco].file, frames[marco].tag);
 

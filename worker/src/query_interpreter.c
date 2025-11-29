@@ -106,7 +106,7 @@ void* correr_query_en_hilo(void* arg) {
 
         case QUERY_ERROR:
             log_error(loggerWorker, "## Query %d: Finalizada por error", q_id);
-            notificar_error_a_master("Error de ejecución");
+            //notificar_error_a_master("Error de ejecución");
             break;
     }
 
@@ -128,7 +128,7 @@ t_estado_query ejecutar_query(char* path_query) {
     FILE* file = fopen(path_query, "r");
     if (file == NULL) {
         log_error(loggerWorker, "No se pudo abrir el archivo: %s", path_query);
-        //free(path_query);
+        notificar_error_a_master("Error al abrir el archivo de la query");
         return QUERY_ERROR;
     }
 
@@ -156,6 +156,7 @@ t_estado_query ejecutar_query(char* path_query) {
             pthread_mutex_unlock(&mutex_error);
             if (error_flag) {
                 log_error(loggerWorker, "## Query %d: Abortando ejecución por error previo", query_actual->query_id);
+                notificar_error_a_master("Error durante la ejecución de la query");
                 estado_salida = QUERY_ERROR;
                 break;
             }
@@ -478,7 +479,7 @@ void ejecutar_read(t_instruccion* inst) {
             
             // Verificamos si la carga fue exitosa
             if (!pedir_pagina_a_storage(formato, *nro_pagina)) {
-                log_error(loggerWorker, "Error irrecuperable: No se pudo cargar la página %d. Abortando READ.", *nro_pagina);
+                log_error(loggerWorker, "No se pudo cargar la página %d. Abortando READ.", *nro_pagina);
                 error_carga = true;
                 
                 // Levantamos la bandera para detener el script
@@ -509,8 +510,7 @@ void ejecutar_read(t_instruccion* inst) {
     agregar_a_paquete(respuesta, &tamanio, sizeof(int));
     agregar_a_paquete(respuesta, contenido, tamanio + 1);
     agregar_a_paquete(respuesta, formato->tag, strlen(formato->tag) + 1);
-    // Nota: El enunciado no pide enviar el nombre del file, pero si tu protocolo lo requiere, déjalo.
-    // agregar_a_paquete(respuesta, formato->file_name, strlen(formato->file_name) + 1);
+    agregar_a_paquete(respuesta, formato->file_name, strlen(formato->file_name) + 1);
 
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);
