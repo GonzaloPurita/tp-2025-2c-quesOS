@@ -127,6 +127,7 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
         enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
         return;
     }
+    
     int tamanioBloques = config_get_int_value(metadata, "TAMAÑO")/superblock->blocksize;
     if (nroBloqueLogico < 0 || nroBloqueLogico >= tamanioBloques) {
         logearResultadoOP(ERROR_OUT_OF_BOUNDS, "READ");
@@ -135,7 +136,22 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
         return;
     }
 
-    int nroBloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, nroBloqueLogico);
+    // Obtener la lista de bloques físicos directamente desde el metadata que ya tenemos
+    char** bloques = config_get_array_value(metadata, "BLOCKS");
+    if (bloques == NULL || bloques[nroBloqueLogico] == NULL) {
+        logearResultadoOP(ERROR_OUT_OF_BOUNDS, "READ");
+        enviarRespuesta(ERROR_OUT_OF_BOUNDS, socket_cliente);
+        if (bloques != NULL) {
+            string_array_destroy(bloques);
+        }
+        config_destroy(metadata);
+        return;
+    }
+    
+    int nroBloqueFisico = atoi(bloques[nroBloqueLogico]);
+    string_array_destroy(bloques);
+    config_destroy(metadata);
+    
     if (nroBloqueFisico == -1) {
         logearResultadoOP(ERROR_OUT_OF_BOUNDS, "READ");
         enviarRespuesta(ERROR_OUT_OF_BOUNDS, socket_cliente);
@@ -305,15 +321,19 @@ op_code commitTag(char* nombreFile, char* nombreTag, int query_id) {
     }
     
     char** blocks = config_get_array_value(metadata, "BLOCKS");
-    config_destroy(metadata);
     int bloquesActuales = contarElementos(blocks);
 
     for (int i = 0; i < bloquesActuales; i++) {
         op_code resultado = validarBloqueLogico(nombreFile, nombreTag, i, query_id);
         if (resultado != OP_SUCCESS) {
+            string_array_destroy(blocks);
+            config_destroy(metadata);
             return resultado;
         }
     }
+    
+    string_array_destroy(blocks);
+    config_destroy(metadata);
     
     metadata = getMetaData(nombreFile, nombreTag);
     config_set_value(metadata, "ESTADO", "COMMITED");
