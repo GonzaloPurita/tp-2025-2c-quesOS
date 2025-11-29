@@ -30,13 +30,21 @@ void recibir_queries() {
             int* pc_inicial = list_get(paquete, 1);
             char* nombre_query = list_get(paquete, 2);
 
-            if (query_actual) free(query_actual); // Limpieza por si quedó algo sucio
+            if (query_actual) {
+                if (query_actual->nombre_query) free(query_actual->nombre_query);
+                free(query_actual);
+            }
             
             query_actual = malloc(sizeof(t_query_context));
             query_actual->query_id = *query_id;
             query_actual->pc_inicial = *pc_inicial;
             query_actual->nombre_query = strdup(nombre_query);
             PC_ACTUAL = *pc_inicial;
+
+            t_hilo_args* args = malloc(sizeof(t_hilo_args));
+            args->query_id = *query_id;
+
+            args->path_script = string_from_format("%s%s", configWorker->path_scripts, nombre_query);
 
             pthread_mutex_lock(&mutex_error);
             query_error_flag = false;
@@ -46,11 +54,13 @@ void recibir_queries() {
             pthread_mutex_unlock(&mutex_interrupt);
 
             pthread_t hilo_cpu;
-            if (pthread_create(&hilo_cpu, NULL, (void*)correr_query_en_hilo, NULL) != 0) {
+            if (pthread_create(&hilo_cpu, NULL, (void*)correr_query_en_hilo, (void*)args) != 0) {
                 log_error(loggerWorker, "Error al crear el hilo de ejecución");
+                free(args->path_script);
+                free(args);
             } else {
                 pthread_detach(hilo_cpu);
-                log_info(loggerWorker, "## Query %d: Hilo de CPU iniciado.", query_actual->query_id);
+                log_info(loggerWorker, "## Query %d: Hilo de CPU iniciado.", args->query_id);
             }
         }
         else if (cod_op == DESALOJO) {
@@ -67,40 +77,47 @@ void recibir_queries() {
 }
 
 void* correr_query_en_hilo(void* arg) {
-    char *path_query = string_new();
-    string_append(&path_query, configWorker->path_scripts);
-    string_append(&path_query, query_actual->nombre_query);
+    // char *path_query = string_new();
+    // string_append(&path_query, configWorker->path_scripts);
+    // string_append(&path_query, query_actual->nombre_query);
+    t_hilo_args* args = (t_hilo_args*) arg;
+    char* path_query = args->path_script;
+    int q_id = args->query_id;
 
-    log_info(loggerWorker, "## Query %d: Ejecutando script: %s", query_actual->query_id, path_query);
+    log_info(loggerWorker, "## Query %d: Ejecutando script: %s", q_id, path_query);
     
     t_estado_query estado = ejecutar_query(path_query); 
-    log_debug(loggerWorker, "## Query %d: Ejecución finalizada con estado %d", query_actual->query_id, estado);
+    log_debug(loggerWorker, "## Query %d: Ejecución finalizada con estado %d", q_id, estado);
 
     switch (estado) {
         case QUERY_DESALOJADA:
-            log_info(loggerWorker, "## Query %d: Desalojada. Guardando contexto...", query_actual->query_id);
+            log_info(loggerWorker, "## Query %d: Desalojada. Guardando contexto...", q_id);
             // TODO: Usar instrucción FLUSH
             guardar_paginas_modificadas();
             notificar_master_desalojo(PC_ACTUAL);
             break;
 
         case QUERY_EXITO:
-            log_info(loggerWorker, "## Query %d: Finalizada exitosamente (EXIT)", query_actual->query_id);
+            log_info(loggerWorker, "## Query %d: Finalizada exitosamente (EXIT)", q_id);
             // TODO: Hay que notificar al Master que terminó la query?
             break;
 
         case QUERY_ERROR:
-            log_error(loggerWorker, "## Query %d: Finalizada por error", query_actual->query_id);
+            log_error(loggerWorker, "## Query %d: Finalizada por error", q_id);
             // TODO: Hay que notificar al Master que hubo error?
             break;
     }
 
-    free(query_actual->nombre_query);
-    free(query_actual);
-    query_actual = NULL;
+    // free(query_actual->nombre_query);
+    // free(query_actual);
+    // query_actual = NULL;
+
+    free(path_query); 
+    free(args);
+
     pthread_mutex_lock(&mutex_interrupt);
     interrupt_flag = false;
-    pthread_mutex_unlock(&mutex_interrupt); 
+    pthread_mutex_unlock(&mutex_interrupt);
     
     return NULL;
 }
@@ -109,7 +126,7 @@ t_estado_query ejecutar_query(char* path_query) {
     FILE* file = fopen(path_query, "r");
     if (file == NULL) {
         log_error(loggerWorker, "No se pudo abrir el archivo: %s", path_query);
-        free(path_query);
+        //free(path_query);
         return QUERY_ERROR;
     }
 
@@ -165,7 +182,7 @@ t_estado_query ejecutar_query(char* path_query) {
 
     free(linea);
     fclose(file);
-    free(path_query);
+    //free(path_query);
 
     return estado_salida;
 }
@@ -473,6 +490,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
     agregar_a_paquete(respuesta, &tamanio, sizeof(int));
     agregar_a_paquete(respuesta, contenido, tamanio + 1);
     agregar_a_paquete(respuesta, formato->tag, strlen(formato->tag) + 1);
+    agregar_a_paquete(respuesta, formato->file_name, strlen(formato->file_name) + 1);
 
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);
@@ -497,7 +515,7 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
     log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
 
-    // para cada página, verifica si está en memoria; si no, pedirla
+    // para cada página, verificamos si esta en memoria
     for (int i = 0; i < list_size(paginas); i++) { 
         int* nro_pagina = list_get(paginas, i);
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
@@ -507,7 +525,6 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
         }
     }
 
-    // escribir valor en memoria
     escribir_en_memoria(formato, direccion_base, valor);
 
     log_debug(loggerWorker, "Página marcada como dirty para %s:%s en base %d", formato->file_name, formato->tag, direccion_base);
@@ -606,7 +623,7 @@ void guardar_paginas_modificadas() {
     t_list* paginas = list_create();
 
     // Obtengo las páginas modificadas
-    sem_wait(&mutex_memoria);
+    pthread_mutex_lock(&mutex_memoria);
     for (int i = 0; i < CANTIDAD_MARCOS; i++) {
         frame* f = &frames[i];
         if (f->ocupado && f->modificado) {
@@ -623,7 +640,7 @@ void guardar_paginas_modificadas() {
             list_add(paginas, p);
         }
     }
-    sem_post(&mutex_memoria);
+    pthread_mutex_unlock(&mutex_memoria);
 
     // Enviar a Storage
     for (int i = 0; i < list_size(paginas); i++) {
@@ -638,9 +655,9 @@ void guardar_paginas_modificadas() {
         enviar_paquete(paquete, conexionStorage);
         eliminar_paquete(paquete);
 
-        sem_wait(&mutex_memoria);
+        pthread_mutex_lock(&mutex_memoria);
         frames[p->index_frame].modificado = false;
-        sem_post(&mutex_memoria);
+        pthread_mutex_unlock(&mutex_memoria);
 
         free(p->file);
         free(p->tag);
@@ -688,10 +705,10 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
     pthread_mutex_unlock(&mutex_error);
 
     // liberar contexto y marcar error
-    if (query_actual) {
-        destruir_query_context(query_actual);
-        query_actual = NULL;
-    }
+    // if (query_actual) {
+    //     destruir_query_context(query_actual);
+    //     query_actual = NULL;
+    // }
 }
 
 void notificar_error_a_master(char* motivo) {

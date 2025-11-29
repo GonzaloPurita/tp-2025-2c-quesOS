@@ -25,7 +25,7 @@ int puntero_clock = 0;
 
 frame* frames;
 
-sem_t mutex_memoria;
+pthread_mutex_t mutex_memoria;
 
 // Diccionarios
 t_dictionary* diccionario_tablas; // clave = "file:tag", valor = tabla_pag*
@@ -43,7 +43,7 @@ void iniciar_memoria(){
 
     frames = calloc(CANTIDAD_MARCOS, sizeof(frame));
 
-    sem_init(&mutex_memoria, 0, 1);
+    pthread_mutex_init(&mutex_memoria, NULL);
 
    diccionario_tablas = dictionary_create();
 

@@ -324,6 +324,7 @@ void* atenderWorker(void* arg){
             int   n   = *(int*) list_get(p, 1); //tamanio
             char* src =        list_get(p, 2); //contenido
             char* tag_src =    list_get(p, 3); // tag del archivo
+            char* file_src = list_get(p, 4); // file del archivo
 
             // copio el buffer de datos
             char* buf = malloc(n);
@@ -331,6 +332,7 @@ void* atenderWorker(void* arg){
 
             // copio la tag para no usar memoria liberada
             char* tag = strdup(tag_src);
+            char* file = strdup(file_src);
 
             list_destroy_and_destroy_elements(p, free);
 
@@ -346,13 +348,13 @@ void* atenderWorker(void* arg){
                 break;
             }
 
-            // 2) Forward al Query Control: [qid:int][n:int][bytes:n][tag:char*]
+            // 2) Forward al Query Control: [file_src:char*][n:int][bytes:n][tag:char*]
             t_paquete* out = crear_paquete();
             out->codigo_operacion = MENSAJE_LECTURA;
-            agregar_a_paquete(out, &qid, sizeof(int));
-            agregar_a_paquete(out, &n,   sizeof(int));
-            agregar_a_paquete(out, buf,  n);
-            agregar_a_paquete(out, tag,  strlen(tag) + 1);
+            agregar_a_paquete(out, file, strlen(file) + 1); // 0
+            agregar_a_paquete(out, &n,   sizeof(int));     // 1
+            agregar_a_paquete(out, buf,  n);               // 2
+            agregar_a_paquete(out, tag,  strlen(tag) + 1); // 3
 
             enviar_paquete(out, fd_qc);
             log_info(loggerMaster,"## Se envía un mensaje de lectura de la Query <%d> en el worker <%s> al Query Control", qid, id);
@@ -360,6 +362,7 @@ void* atenderWorker(void* arg){
 
             free(buf);
             free(tag);
+            free(file);
             break;
         }
 

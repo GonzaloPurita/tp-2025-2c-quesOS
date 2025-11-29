@@ -4,8 +4,8 @@ void escucharMaster(int conexionMaster){
     while (1) {
         int cod_op = recibir_operacion(conexionMaster);
         if (cod_op == -1) {
-        log_error(loggerQueryControl, "Se perdió la conexión con el Master.");
-        break;
+            log_error(loggerQueryControl, "Se perdió la conexión con el Master.");
+            break;
         }
 
         t_list* valores = recibir_paquete(conexionMaster);
@@ -22,10 +22,13 @@ void escucharMaster(int conexionMaster){
                     list_destroy_and_destroy_elements(valores, free);
                     break;
                 }
-                char* file_tag = list_get(valores, 3);
+                char* file = list_get(valores, 0);
+                int tamanio = *(int*) list_get(valores, 1);
                 char* contenido = list_get(valores, 2);
+                char* file_tag = list_get(valores, 3);
+                contenido[tamanio] = '\0'; // Aseguro null-termination
 
-                log_info(loggerQueryControl,"## Lectura realizada: Archivo %s, contenido: %s", file_tag, contenido);
+                log_info(loggerQueryControl,"## Lectura realizada: Archivo %s:%s, contenido: %s", file, file_tag, contenido);
                 break;
             case RTA_SUBMIT_QUERY:
             // recibe: <Mensaje de confirmación>

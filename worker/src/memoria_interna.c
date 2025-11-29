@@ -56,16 +56,41 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
     free(clave_tabla);
 
+    // Si no existe la tabla, retornamos buffer vacio (o podrías manejar error)
+    if (tabla == NULL) {
+        log_error(loggerWorker, "Error: Tabla de paginas no encontrada para lectura");
+        return buffer; 
+    }
+
     for (int p = pagina_inicio; p <= pagina_fin; p++) {
         char* clave_pag = string_itoa(p);
         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
         free(clave_pag);
 
+        if (entrada == NULL || !entrada->presente || entrada->indice_frame == -1) {
+            log_warning(loggerWorker, "Intentando leer página %d no presente en RAM (Frame %d)", 
+                      p, (entrada ? entrada->indice_frame : -99));
+            // por ahora seguimos para no romper todo, pero podrimos abortar o rellenar con ceros
+            // si pasa esto es q 'pedir_pagina_a_storage' no se llamó antes.
+            
+            // Avanzamos los contadores para que el bucle no se desincronice
+            int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
+            bytes_restantes -= bytes_a_usar;
+            posicion_buffer += bytes_a_usar;
+            offset = 0;
+            continue; 
+        }
+
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
 
+        entrada->uso = true;
+        frames[frame].uso = true;
+        frames[frame].timestamp = obtener_timestamp();
+
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset; // los bytes a usar van ser los que quedan o los que entran en la página
 
+        usleep(configWorker->retardo_memoria * 1000);
         memcpy(buffer + posicion_buffer, MEMORIA + dir_fisica, bytes_a_usar);
 
         bytes_restantes -= bytes_a_usar;
@@ -104,6 +129,7 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
         // Calculamos cuánto escribir en esta página
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
 
+        usleep(configWorker->retardo_memoria * 1000);
         // Si la página es nueva, pedir_pagina_a_storage ya debió traerla limpia o con datos.
         memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
 
@@ -140,7 +166,7 @@ int obtener_marco_libre_o_victima() {
 int elegir_victima() {
     if (strcmp(configWorker->algoritmo_reemplazo, "LRU") == 0) {
         return elegir_victima_LRU();
-    } 
+    }
     else if (strcmp(configWorker->algoritmo_reemplazo, "CLOCK-M") == 0) {
         return elegir_victima_CLOCKM();
     }
@@ -165,13 +191,13 @@ int elegir_victima_LRU() {
 
 int elegir_victima_CLOCKM() {
     int vueltas = 0;
-    int inicio = puntero_clock;
+    int inicio = puntero_clock; // arranca en cero
 
     while (1) {
         frame* frame = &frames[puntero_clock];
 
         // Caso 1: uso=0, modificado=0
-        if (frame->ocupado && !frame->uso && !frame->modificado) {
+        if (frame->ocupado && !frame->uso && !frame->modificado) { // no hace falta chequear ocupado
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
             log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=0): marco %d", victima);
@@ -202,6 +228,8 @@ int elegir_victima_CLOCKM() {
 }
 
 void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
+    pthread_mutex_lock(&mutex_memoria);
+    
     char clave_tabla[128];
     snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
 
@@ -269,11 +297,11 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
         free(clave_ant);
 
         // Liberar strings del marco viejo
-        if (frames[marco].file) free(frames[marco].file);
-        if (frames[marco].tag) free(frames[marco].tag);
+        // if (frames[marco].file) free(frames[marco].file);
+        // if (frames[marco].tag) free(frames[marco].tag);
     }
 
-    int nro_bloque = nro_pagina; 
+    int nro_bloque = nro_pagina;
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
 
@@ -291,14 +319,19 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
         log_error(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
+        pthread_mutex_unlock(&mutex_memoria);
         return; 
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
     char* contenido_bloque = list_get(lista, 0);
     
+    usleep(configWorker->retardo_memoria * 1000);
     // Copiar contenido a memoria física
     memcpy(MEMORIA + marco * TAM_PAGINA, contenido_bloque, TAM_PAGINA);
+
+    if (frames[marco].file) free(frames[marco].file);
+    if (frames[marco].tag) free(frames[marco].tag);
 
     // Actualizar Frame
     frames[marco].ocupado = true;
@@ -327,4 +360,6 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
 
     log_debug(loggerWorker, "SWAP IN: Página %d de %s:%s cargada en marco %d", 
               nro_pagina, formato->file_name, formato->tag, marco);
+
+    pthread_mutex_unlock(&mutex_memoria);
 }
