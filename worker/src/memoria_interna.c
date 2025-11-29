@@ -93,6 +93,9 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         usleep(configWorker->retardo_memoria * 1000);
         memcpy(buffer + posicion_buffer, MEMORIA + dir_fisica, bytes_a_usar);
 
+        log_info(loggerWorker, "Query %d: Acción: LEER - Dirección Física: %d - Valor: %s", 
+            query_actual->query_id, dir_fisica, buffer + posicion_buffer);
+
         bytes_restantes -= bytes_a_usar;
         posicion_buffer += bytes_a_usar;
         offset = 0; // a partir de la segunda página empieza desde 0, porque antes tal vez arrancaba con la primer pagina empezada, pero ya la segunda si o si arranc de cero
@@ -132,6 +135,9 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
         usleep(configWorker->retardo_memoria * 1000);
         // Si la página es nueva, pedir_pagina_a_storage ya debió traerla limpia o con datos.
         memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
+
+        log_info(loggerWorker, "Query %d: Acción: ESCRIBIR - Dirección Física: %d - Valor: %s", 
+                 query_actual->query_id, dir_fisica, valor + posicion_valor);
 
         entrada->modificado = true; 
         frames[frame].modificado = true; 
@@ -357,8 +363,8 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     free(clave_pag);
     list_destroy_and_destroy_elements(lista, free);
 
-    log_debug(loggerWorker, "SWAP IN: Página %d de %s:%s cargada en marco %d", 
-              nro_pagina, formato->file_name, formato->tag, marco);
+    log_info(loggerWorker, "Query %d: Se asigna el Marco: %d a la Página: %d perteneciente al - File: %s - Tag: %s",
+        query_actual->query_id, marco, nro_pagina, formato->file_name, formato->tag);
 
     pthread_mutex_unlock(&mutex_memoria);
 }

@@ -46,6 +46,8 @@ void recibir_queries() {
 
             args->path_script = string_from_format("%s%s", configWorker->path_scripts, nombre_query);
 
+            log_info(loggerWorker, "## Query %d: Se recibe la Query. El path de operaciones es: %s", args->query_id, args->path_script);
+
             pthread_mutex_lock(&mutex_error);
             query_error_flag = false;
             pthread_mutex_unlock(&mutex_error);
@@ -67,7 +69,7 @@ void recibir_queries() {
             pthread_mutex_lock(&mutex_interrupt);
             interrupt_flag = true;
             pthread_mutex_unlock(&mutex_interrupt);
-            log_warning(loggerWorker, "Master pidió desalojo (Hilo Principal)");
+            log_info(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
         }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
@@ -158,7 +160,7 @@ t_estado_query ejecutar_query(char* path_query) {
                 break;
             }
 
-            log_info(loggerWorker, "## Query %d: FETCH - PC: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
+            log_info(loggerWorker, "## Query %d: FETCH - FETCH : %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
             t_instruccion* inst = decode(linea);
             execute(inst);
@@ -472,6 +474,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
+            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
             pedir_pagina_a_storage(formato, *nro_pagina);
         }
     }
@@ -519,6 +522,7 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
+            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
             pedir_pagina_a_storage(formato, *nro_pagina);
         }
     }
@@ -611,7 +615,8 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         if (rta == OP_SUCCESS)
             log_debug(loggerWorker,"Flush OK página/bloque %d", nro_pagina);
         else
-            log_error(loggerWorker,"Error flush en página/bloque %d", nro_pagina);
+            manejar_respuesta_storage(rta, "FLUSH");
+            // log_error(loggerWorker,"Error flush en página/bloque %d", nro_pagina);
     }
 
     list_destroy(keys);
