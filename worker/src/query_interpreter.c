@@ -624,7 +624,7 @@ void guardar_paginas_modificadas() {
     t_list* paginas = list_create();
 
     // Obtengo las páginas modificadas
-    sem_wait(&mutex_memoria);
+    pthread_mutex_lock(&mutex_memoria);
     for (int i = 0; i < CANTIDAD_MARCOS; i++) {
         frame* f = &frames[i];
         if (f->ocupado && f->modificado) {
@@ -641,7 +641,7 @@ void guardar_paginas_modificadas() {
             list_add(paginas, p);
         }
     }
-    sem_post(&mutex_memoria);
+    pthread_mutex_unlock(&mutex_memoria);
 
     // Enviar a Storage
     for (int i = 0; i < list_size(paginas); i++) {
@@ -656,9 +656,9 @@ void guardar_paginas_modificadas() {
         enviar_paquete(paquete, conexionStorage);
         eliminar_paquete(paquete);
 
-        sem_wait(&mutex_memoria);
+        pthread_mutex_lock(&mutex_memoria);
         frames[p->index_frame].modificado = false;
-        sem_post(&mutex_memoria);
+        pthread_mutex_unlock(&mutex_memoria);
 
         free(p->file);
         free(p->tag);

@@ -44,7 +44,7 @@ extern int PC_ACTUAL;
 extern int TAM_BLOQUE;
 
 // /* semaforos */
-extern sem_t mutex_memoria;
+extern pthread_mutex_t mutex_memoria;
 
 extern int puntero_clock;
 

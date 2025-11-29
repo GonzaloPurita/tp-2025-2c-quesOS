@@ -90,6 +90,7 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
 
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset; // los bytes a usar van ser los que quedan o los que entran en la página
 
+        usleep(configWorker->retardo_memoria * 1000);
         memcpy(buffer + posicion_buffer, MEMORIA + dir_fisica, bytes_a_usar);
 
         bytes_restantes -= bytes_a_usar;
@@ -128,6 +129,7 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
         // Calculamos cuánto escribir en esta página
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
 
+        usleep(configWorker->retardo_memoria * 1000);
         // Si la página es nueva, pedir_pagina_a_storage ya debió traerla limpia o con datos.
         memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
 
@@ -226,6 +228,8 @@ int elegir_victima_CLOCKM() {
 }
 
 void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
+    pthread_mutex_lock(&mutex_memoria);
+    
     char clave_tabla[128];
     snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
 
@@ -293,8 +297,8 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
         free(clave_ant);
 
         // Liberar strings del marco viejo
-        if (frames[marco].file) free(frames[marco].file);
-        if (frames[marco].tag) free(frames[marco].tag);
+        // if (frames[marco].file) free(frames[marco].file);
+        // if (frames[marco].tag) free(frames[marco].tag);
     }
 
     int nro_bloque = nro_pagina;
@@ -315,14 +319,19 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
         log_error(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
+        pthread_mutex_unlock(&mutex_memoria);
         return; 
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
     char* contenido_bloque = list_get(lista, 0);
     
+    usleep(configWorker->retardo_memoria * 1000);
     // Copiar contenido a memoria física
     memcpy(MEMORIA + marco * TAM_PAGINA, contenido_bloque, TAM_PAGINA);
+
+    if (frames[marco].file) free(frames[marco].file);
+    if (frames[marco].tag) free(frames[marco].tag);
 
     // Actualizar Frame
     frames[marco].ocupado = true;
@@ -351,4 +360,6 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
 
     log_debug(loggerWorker, "SWAP IN: Página %d de %s:%s cargada en marco %d", 
               nro_pagina, formato->file_name, formato->tag, marco);
+
+    pthread_mutex_unlock(&mutex_memoria);
 }
