@@ -89,7 +89,6 @@ void* correr_query_en_hilo(void* arg) {
     log_info(loggerWorker, "## Query %d: Ejecutando script: %s", q_id, path_query);
     
     t_estado_query estado = ejecutar_query(path_query); 
-    log_debug(loggerWorker, "## Query %d: Ejecución finalizada con estado %d", q_id, estado);
 
     switch (estado) {
         case QUERY_DESALOJADA:
@@ -161,7 +160,7 @@ t_estado_query ejecutar_query(char* path_query) {
                 break;
             }
 
-            log_info(loggerWorker, "## Query %d: FETCH - FETCH : %d - %s", query_actual->query_id, PC_ACTUAL, linea);
+            log_info(loggerWorker, "## Query %d: FETCH - Program Counter : %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
             t_instruccion* inst = decode(linea);
             execute(inst);
@@ -548,8 +547,6 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
     escribir_en_memoria(formato, direccion_base, valor);
 
-    log_debug(loggerWorker, "Página marcada como dirty para %s:%s en base %d", formato->file_name, formato->tag, direccion_base);
-
     // informo al Master que se hizo el WRITE
     t_paquete* respuesta = crear_paquete();
     respuesta->codigo_operacion = OP_WRITE;
@@ -631,11 +628,8 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         t_list* rtaList = recibir_paquete(conexionStorage);
         if (rtaList) list_destroy_and_destroy_elements(rtaList, free);
 
-        if (rta == OP_SUCCESS)
-            log_debug(loggerWorker,"Flush OK página/bloque %d", nro_pagina);
-        else
+        if (rta != OP_SUCCESS)
             manejar_respuesta_storage(rta, "FLUSH");
-            // log_error(loggerWorker,"Error flush en página/bloque %d", nro_pagina);
     }
 
     list_destroy(keys);

@@ -66,7 +66,6 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         char* clave_pag = string_itoa(p);
         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
         
-        // --- FIX: AUTO-RECUPERACIÓN DE PÁGINA ---
         // Si la página fue desalojada por una posterior en la misma instrucción, la traemos de vuelta.
         if (entrada == NULL || !entrada->presente || entrada->indice_frame == -1) {
             log_warning(loggerWorker, "Page Fault dentro de READ (Thrashing): Recuperando Página %d", p);
@@ -100,6 +99,9 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         usleep(configWorker->retardo_memoria * 1000);
         
         memcpy(buffer + posicion_buffer, MEMORIA + dir_fisica, bytes_a_usar);
+
+        log_info(loggerWorker, "Query %d: Acción: LEER - Dirección Física: %d - Valor: %s", 
+            query_actual->query_id, dir_fisica, buffer + posicion_buffer);
 
         bytes_restantes -= bytes_a_usar;
         posicion_buffer += bytes_a_usar;
@@ -241,9 +243,6 @@ int elegir_victima_CLOCKM() {
 bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     pthread_mutex_lock(&mutex_memoria);
 
-    log_info(loggerWorker, "Query %d: - Memoria Miss - File: %s - Tag: %s - Pagina: %d", 
-             query_actual->query_id, formato->file_name, formato->tag, nro_pagina);
-
     // 1. Obtener/Crear Tabla
     char clave_tabla[128];
     snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
@@ -270,10 +269,11 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
             frames[marco].file, frames[marco].tag, frames[marco].page_num, // Datos de la Víctima
             formato->file_name, formato->tag, nro_pagina);
 
+        log_info(loggerWorker, "Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+            query_actual->query_id, marco, frames[marco].file, frames[marco].tag);
+
         // Write-Back
         if (frames[marco].modificado) {
-            log_info(loggerWorker, "SWAP OUT: La página %d de %s:%s está sucia. Guardando en Storage...", 
-                     frames[marco].page_num, frames[marco].file, frames[marco].tag);
 
             t_paquete* paquete = crear_paquete();
             paquete->codigo_operacion = OP_WRITE; 
@@ -334,25 +334,22 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
 
     op_code op = recibir_operacion(conexionStorage);
 
-    // --- MANEJO DE ERROR DEL STORAGE ---
     if (op != OP_SUCCESS) {
         log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d (Posible Out of Bounds)", nro_bloque);
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
         pthread_mutex_unlock(&mutex_memoria);
-        return false; // RETORNAMOS FALLO
+        return false;
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
     char* contenido_bloque = list_get(lista, 0);
     
-    // --- RETARDO SIMULADO ---
     usleep(configWorker->retardo_memoria * 1000);
 
     // 5. Actualizar Memoria
     memcpy(MEMORIA + marco * TAM_PAGINA, contenido_bloque, TAM_PAGINA);
 
-    // --- FIX MEMORY LEAK: Liberamos lo viejo AQUÍ ---
     if (frames[marco].file) free(frames[marco].file);
     if (frames[marco].tag) free(frames[marco].tag);
     // ------------------------------------------------
@@ -383,7 +380,6 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     free(clave_pag);
     list_destroy_and_destroy_elements(lista, free);
 
-    // --- LOG OBLIGATORIO: ADD / ASIGNACIÓN ---
     log_info(loggerWorker, "Query %d: - Memoria Add - File: %s - Tag: %s - Pagina: %d - Marco: %d",
              query_actual->query_id, formato->file_name, formato->tag, nro_pagina, marco);
              
@@ -391,5 +387,5 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
              query_actual->query_id, marco, nro_pagina, formato->file_name, formato->tag);
 
     pthread_mutex_unlock(&mutex_memoria);
-    return true; // ÉXITO
+    return true;
 }
