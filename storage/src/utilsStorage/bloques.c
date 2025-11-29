@@ -46,7 +46,9 @@ bool escribirBloqueInicial() {
         log_error(loggerStorage, "Error escribiendo bloque inicial, no se pudo reservar memoria");
         return false;
     }
-    memset(datos, 0, superblock->blocksize);
+    for(int i = 0; i < superblock->blocksize; i++) {
+        datos[i] = '0';
+    }
     bool resultado = escribirBloqueFisico(0, datos, superblock->blocksize, false, 0);
     free(datos);
     return resultado;
