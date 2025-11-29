@@ -492,6 +492,7 @@ void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_
     agregar_a_paquete(respuesta, &tamanio, sizeof(int));
     agregar_a_paquete(respuesta, contenido, tamanio + 1);
     agregar_a_paquete(respuesta, formato->tag, strlen(formato->tag) + 1);
+    agregar_a_paquete(respuesta, formato->file_name, strlen(formato->file_name) + 1);
 
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);
