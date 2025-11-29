@@ -20,7 +20,6 @@ typedef struct {
     bool conectado;   // true si el socket sigue vivo
     int  qid_actual;  // -1 si está libre; si no, el QID que ejecuta
     sem_t semaforo;
-			sem_t esperarQuery;
 } t_conexionWorker;
 
 // Inicialización 
