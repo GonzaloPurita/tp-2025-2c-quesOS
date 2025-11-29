@@ -297,7 +297,7 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
             if(rtaList) list_destroy_and_destroy_elements(rtaList, free);
 
             if (rta != OP_SUCCESS) {
-                log_error(loggerWorker, "CRITICAL: Falló el guardado de página víctima.");
+                log_error(loggerWorker, "Falló el guardado de página víctima.");
             }
         }
 
