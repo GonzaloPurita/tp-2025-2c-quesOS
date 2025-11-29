@@ -694,6 +694,9 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
         case ERROR_OUT_OF_BOUNDS:
             motivo_error = "Lectura fuera de límites";
             break;
+        case ERROR_FILE_TAG_EXISTS:
+            motivo_error = "File:Tag ya existe";
+            break;
         default:
             motivo_error = "Error desconocido";
             break;

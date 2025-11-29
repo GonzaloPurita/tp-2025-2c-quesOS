@@ -127,7 +127,13 @@ void readBloqueLogico(t_list* data, int socket_cliente) {
         enviarRespuesta(ERROR_FILE_NOT_FOUND, socket_cliente);
         return;
     }
-    config_destroy(metadata);
+    int tamanioBloques = config_get_int_value(metadata, "TAMAÑO")/superblock->blocksize;
+    if (nroBloqueLogico < 0 || nroBloqueLogico >= tamanioBloques) {
+        logearResultadoOP(ERROR_OUT_OF_BOUNDS, "READ");
+        enviarRespuesta(ERROR_OUT_OF_BOUNDS, socket_cliente);
+        config_destroy(metadata);
+        return;
+    }
 
     int nroBloqueFisico = obtenerBloqueFisico(nombreFile, nombreTag, nroBloqueLogico);
     if (nroBloqueFisico == -1) {
@@ -426,7 +432,7 @@ op_code opTag(char* fOriginal, char* tOriginal, char* f, char* t, int query_id) 
     if (metaDataDestino != NULL) {
         log_error(loggerStorage, "El tag destino %s:%s ya existe", f, t);
         config_destroy(metaDataDestino);
-        return OP_FAILED;
+        return ERROR_FILE_TAG_EXISTS;
     }
 
     // Crear el tag destino
