@@ -265,8 +265,10 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     // 3. Desalojo (Swap Out)
     if (frames[marco].ocupado) {
         
-        log_info(loggerWorker, "Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
-                 query_actual->query_id, marco, frames[marco].file, frames[marco].tag);
+        log_info(loggerWorker, "## Query %d: Se reemplaza la página %s:%s/%d por la %s:%s/%d",
+            query_actual->query_id,
+            frames[marco].file, frames[marco].tag, frames[marco].page_num, // Datos de la Víctima
+            formato->file_name, formato->tag, nro_pagina);
 
         // Write-Back
         if (frames[marco].modificado) {
