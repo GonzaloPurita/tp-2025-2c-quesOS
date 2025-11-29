@@ -4,5 +4,6 @@
 #include <utils/conexiones.h>
 #include <utils/paquete.h>
 #include <utilsQueryControl/queryConfig.h>
+#include "comunicacionMaster.h"
 
 #endif /* MAIN_H_ */
