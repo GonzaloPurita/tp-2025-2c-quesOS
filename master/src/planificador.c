@@ -103,22 +103,28 @@ void planificarSinDesalojo() {
 }
 
 void enviarQueryAWorker(t_query* query) {
-    t_conexionWorker* conexionWorker = obtenerWorkerLibre(); // Obtengo un worker libre
-    conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
-    log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", query->QCB->QID, query->prioridad_actual, conexionWorker->id); 
-    enviarQCB(conexionWorker->fd, query->QCB, query->path); //
-    pthread_t hiloWORKER;
-    pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) conexionWorker); 
-    pthread_detach(hiloWORKER);
+    t_conexionWorker* conexionWorker = obtenerWorkerLibre();
+    if (!conexionWorker) {
+        log_error(loggerMaster, "No hay workers libres!");
+        return;
+    }
+    pthread_mutex_lock(&mutex_workers);
+    conexionWorker->qid_actual = query->QCB->QID;
+    pthread_mutex_unlock(&mutex_workers);
+    log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", 
+             query->QCB->QID, query->prioridad_actual, conexionWorker->id);
+    
+    enviarQCB(conexionWorker->fd, query->QCB, query->path);
+    sem_post(&esperarQuery);
 }
 
 void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWorker) {
-    conexionWorker->qid_actual = query ->QCB->QID;// Le asigno el QID de la query a ejecutar.
+    pthread_mutex_lock(&mutex_workers);
+    conexionWorker->qid_actual = query->QCB->QID;
+    pthread_mutex_unlock(&mutex_workers);
     log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", query->QCB->QID, query->prioridad_actual, conexionWorker->id);
-    enviarQCB(conexionWorker->fd, query->QCB, query->path); // 
-    pthread_t hiloWORKER;
-    pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) conexionWorker); 
-    pthread_detach(hiloWORKER);
+    enviarQCB(conexionWorker->fd, query->QCB, query->path); 
+    sem_post(&esperarQuery);
 }
 
 t_conexionWorker* obtenerWorkerLibre() {
@@ -129,6 +135,7 @@ t_conexionWorker* obtenerWorkerLibre() {
         if (it->conectado && it->qid_actual == -1) { w = it; break; }
     }
     pthread_mutex_unlock(&mutex_workers);
+    log_debug(loggerMaster, "Worker libre: %s", w ? w->id : "Ninguno");
     return w;
 }
 

@@ -4,6 +4,7 @@
 sem_t sem_workers_disponibles; // Contador de workers libres
 sem_t hay_query_ready; // Contador de queries en READY
 sem_t rePlanificar; // Semaforo para indicar que se debe replanificar --> Para desalojo (Prioridades)
+sem_t esperarQuery;
 
 // --- MUTEX ---
 pthread_mutex_t mutex_workers;
@@ -25,6 +26,7 @@ void inicializarSemaforos(void) {
     sem_init(&sem_workers_disponibles, 0, 0);
     sem_init(&rePlanificar, 0, 0);
     sem_init(&hay_query_ready, 0, 0);
+    sem_init(&esperarQuery, 0, 0);
 }
 
 void destruirSemaforos(void) {

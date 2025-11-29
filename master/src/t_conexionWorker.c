@@ -63,6 +63,10 @@ int worker_registrar(char* id, int fd) {
     int list_size_now = list_size(LISTA_WORKERS);
     pthread_mutex_unlock(&mutex_workers);
 
+    pthread_t hiloWORKER;
+    pthread_create(&hiloWORKER, NULL, atenderWorker, (void*) w); 
+    pthread_detach(hiloWORKER);
+
     return list_size_now;
 }
 
@@ -73,6 +77,7 @@ void worker_marcar_libre_por_fd(int fd) {
         if (w->fd == fd) { w->qid_actual = -1; break; }
     }
     pthread_mutex_unlock(&mutex_workers);
+    log_debug(loggerMaster, "worker_marcar_libre_por_fd: Worker con fd %d marcado como libre", fd);
 }
 
 int workers_conectados(void) {
@@ -205,6 +210,7 @@ void* atenderWorker(void* arg){
   int fd = conexionWorker ->fd;
   char* id = conexionWorker ->id;
   while (1) {
+      sem_wait(&esperarQuery);
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
         worker_desconectar_por_fd(fd);
@@ -412,26 +418,30 @@ void* atenderWorker(void* arg){
             pthread_mutex_unlock(&mutex_cola_exit);
             
             // marco libre al worker
-            worker_marcar_libre_por_fd(fd);
+            conexionWorker->qid_actual = -1;
+            log_debug(loggerMaster, "cantidad de workers disponibles: %d", workers_disponibles());
             
-            // Replanifico según el algoritmo
+            
+            // Notificar al Query Control
+            t_paquete* r = crear_paquete();
+            r->codigo_operacion = QUERY_FINALIZADA;
+            agregar_a_paquete(r, &qid, sizeof(int));
+            agregar_a_paquete(r, motivo_copia, strlen(motivo_copia));
+            enviar_paquete(r, fd_qc);
+            eliminar_paquete(r);
+            
+            free(motivo_copia);
+
+             // Replanifico según el algoritmo
             if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0) {
                 sem_post(&sem_workers_disponibles);
             } else {
                 sem_post(&rePlanificar);
             }
             
-            // Notificar al Query Control
-            t_paquete* r = crear_paquete();
-            r->codigo_operacion = QUERY_FINALIZADA;
-            agregar_a_paquete(r, &qid, sizeof(int));
-            agregar_a_paquete(r, motivo_copia, strlen(motivo_copia) + 1);
-            enviar_paquete(r, fd_qc);
-            eliminar_paquete(r);
-            
-            free(motivo_copia);
-            
             log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
+
+            log_debug(loggerMaster, "informacion del worker QID actual %d, Conectado %d", conexionWorker->qid_actual, conexionWorker->conectado);
             
             break; 
         }

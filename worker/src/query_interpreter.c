@@ -148,8 +148,6 @@ t_estado_query ejecutar_query(char* path_query) {
             t_instruccion* inst = decode(linea);
             execute(inst);
             destruir_instruccion(inst);
-
-            log_debug(loggerWorker, "SIGUIENTEEEEEE");
             
             PC_ACTUAL++;
 
@@ -699,7 +697,7 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
 void notificar_error_a_master(char* motivo) {
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = OP_ERROR;
-
+    
     // envio id query
     agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
     // el motivo seria como un string
