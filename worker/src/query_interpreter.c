@@ -160,8 +160,6 @@ t_estado_query ejecutar_query(char* path_query) {
 
             log_info(loggerWorker, "## Query %d: FETCH - PC: %d - %s", query_actual->query_id, PC_ACTUAL, linea);
 
-            usleep(configWorker->retardo_memoria * 1000);
-
             t_instruccion* inst = decode(linea);
             execute(inst);
             destruir_instruccion(inst);

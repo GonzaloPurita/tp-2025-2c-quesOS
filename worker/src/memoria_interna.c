@@ -326,7 +326,6 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     t_list* lista = recibir_paquete(conexionStorage);
     char* contenido_bloque = list_get(lista, 0);
     
-    usleep(configWorker->retardo_memoria * 1000);
     // Copiar contenido a memoria física
     memcpy(MEMORIA + marco * TAM_PAGINA, contenido_bloque, TAM_PAGINA);
 
