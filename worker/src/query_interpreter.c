@@ -105,7 +105,7 @@ void* correr_query_en_hilo(void* arg) {
             break;
 
         case QUERY_ERROR:
-            log_warning(loggerWorker, "## Query %d: Finalizada por error", q_id);
+            log_error(loggerWorker, "## Query %d: Finalizada por error", q_id);
             notificar_error_a_master("Error de ejecución");
             break;
     }
@@ -155,7 +155,7 @@ t_estado_query ejecutar_query(char* path_query) {
             bool error_flag = query_error_flag;
             pthread_mutex_unlock(&mutex_error);
             if (error_flag) {
-                log_warning(loggerWorker, "## Query %d abortada por error externo", query_actual->query_id);
+                log_error(loggerWorker, "## Query %d: Abortando ejecución por error previo", query_actual->query_id);
                 estado_salida = QUERY_ERROR;
                 break;
             }
@@ -457,41 +457,60 @@ void ejecutar_end(t_instruccion* inst){
 }
 
 
-void ejecutar_read(t_instruccion* inst){ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>  ej: READ MATERIAS:BASE 0 8
+ // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>  ej: READ MATERIAS:BASE 0 8
+void ejecutar_read(t_instruccion* inst) { 
     char* recurso = inst->parametros[0];
     int direccion_base = atoi(inst->parametros[1]);
     int tamanio = atoi(inst->parametros[2]);
 
     t_formato* formato = mapear_formato(recurso);
-
-    //Consigna: La instrucción READ leerá de la Memoria Interna los bytes correspondientes a partir de la dirección 
-    //base del File y Tag pasados por parámetro, y deberá enviar dicha información al módulo Master. 
-    
     t_list* paginas = paginas_necesarias(direccion_base, tamanio);
+    
+    bool error_carga = false;
 
-    for (int i = 0; i < list_size(paginas); i++) { // para cada página, verifica si está en memoria; si no, pedirla
+    // 1. Cargar páginas necesarias (Fetch)
+    for (int i = 0; i < list_size(paginas); i++) {
         int* nro_pagina = list_get(paginas, i);
         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
 
         if (!en_memoria) {
-            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
-            pedir_pagina_a_storage(formato, *nro_pagina);
+            // Ya no logueamos MISS aquí porque lo hace pedir_pagina_a_storage
+            
+            // Verificamos si la carga fue exitosa
+            if (!pedir_pagina_a_storage(formato, *nro_pagina)) {
+                log_error(loggerWorker, "Error irrecuperable: No se pudo cargar la página %d. Abortando READ.", *nro_pagina);
+                error_carga = true;
+                
+                // Levantamos la bandera para detener el script
+                pthread_mutex_lock(&mutex_error);
+                query_error_flag = true;
+                pthread_mutex_unlock(&mutex_error);
+                break;
+            }
         }
     }
 
+    if (error_carga) {
+        list_destroy_and_destroy_elements(paginas, free);
+        destruir_formato(formato);
+        // Retornamos sin leer para evitar Segmentation Fault
+        return; 
+    }
+
+    // 2. Leer de Memoria (Solo si todo cargó bien)
     char* contenido = leer_desde_memoria(formato, direccion_base, tamanio);
     log_info(loggerWorker, "Contenido leído de memoria para READ %s dir_base=%d tam=%d: %s", recurso, direccion_base, tamanio, contenido);
 
-    // enviar el resultado al Master
+    // 3. Enviar respuesta al Master
     t_paquete* respuesta = crear_paquete();
     respuesta->codigo_operacion = OP_READ;
-    // agregar_a_paquete(respuesta, contenido, strlen(contenido) + 1);
 
     agregar_a_paquete(respuesta, &query_actual->query_id, sizeof(int));
     agregar_a_paquete(respuesta, &tamanio, sizeof(int));
     agregar_a_paquete(respuesta, contenido, tamanio + 1);
     agregar_a_paquete(respuesta, formato->tag, strlen(formato->tag) + 1);
-    agregar_a_paquete(respuesta, formato->file_name, strlen(formato->file_name) + 1);
+    // Nota: El enunciado no pide enviar el nombre del file, pero si tu protocolo lo requiere, déjalo.
+    // agregar_a_paquete(respuesta, formato->file_name, strlen(formato->file_name) + 1);
 
     enviar_paquete(respuesta, conexionMaster);
     eliminar_paquete(respuesta);

@@ -233,9 +233,14 @@ int elegir_victima_CLOCKM() {
     }
 }
 
-void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
+bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     pthread_mutex_lock(&mutex_memoria);
-    
+
+    // --- LOG OBLIGATORIO: MISS ---
+    log_info(loggerWorker, "Query %d: - Memoria Miss - File: %s - Tag: %s - Pagina: %d", 
+             query_actual->query_id, formato->file_name, formato->tag, nro_pagina);
+
+    // 1. Obtener/Crear Tabla
     char clave_tabla[128];
     snprintf(clave_tabla, sizeof(clave_tabla), "%s:%s", formato->file_name, formato->tag);
 
@@ -250,10 +255,17 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
         dictionary_put(diccionario_tablas, clave_heap, tabla);
     }
 
+    // 2. Elegir Marco
     int marco = obtener_marco_libre_o_victima();
 
+    // 3. Desalojo (Swap Out)
     if (frames[marco].ocupado) {
         
+        // --- LOG OBLIGATORIO: LIBERACIÓN ---
+        log_info(loggerWorker, "Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                 query_actual->query_id, marco, frames[marco].file, frames[marco].tag);
+
+        // Write-Back
         if (frames[marco].modificado) {
             log_info(loggerWorker, "SWAP OUT: La página %d de %s:%s está sucia. Guardando en Storage...", 
                      frames[marco].page_num, frames[marco].file, frames[marco].tag);
@@ -264,7 +276,7 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
             agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
             agregar_a_paquete(paquete, frames[marco].file, strlen(frames[marco].file) + 1);
             agregar_a_paquete(paquete, frames[marco].tag, strlen(frames[marco].tag) + 1);
-            agregar_a_paquete(paquete, &frames[marco].page_num, sizeof(int)); // nro_bloque/pagina
+            agregar_a_paquete(paquete, &frames[marco].page_num, sizeof(int)); 
 
             void* contenido_victima = MEMORIA + (marco * TAM_PAGINA);
             agregar_a_paquete(paquete, contenido_victima, TAM_PAGINA);
@@ -280,12 +292,11 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
             if(rtaList) list_destroy_and_destroy_elements(rtaList, free);
 
             if (rta != OP_SUCCESS) {
-                log_error(loggerWorker, "CRITICAL: Falló el guardado de página víctima. Datos perdidos.");
-            } else {
-                log_debug(loggerWorker, "Página víctima guardada OK.");
+                log_error(loggerWorker, "CRITICAL: Falló el guardado de página víctima.");
             }
         }
 
+        // Invalidar tabla anterior
         char* clave_ant = string_from_format("%s:%s", frames[marco].file, frames[marco].tag);
         tabla_pag* tabla_ant = dictionary_get(diccionario_tablas, clave_ant);
 
@@ -294,19 +305,16 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
             entrada_pag* entrada_ant = dictionary_get(tabla_ant->paginas, clave_pag_ant);
 
             if (entrada_ant != NULL) {
-                entrada_ant->presente = false;     // Ya no está en RAM
-                entrada_ant->modificado = false;   // Ya se guardó (o estaba limpia)
+                entrada_ant->presente = false;
+                entrada_ant->modificado = false;
                 entrada_ant->indice_frame = -1;
             }
             free(clave_pag_ant);
         }
         free(clave_ant);
-
-        // Liberar strings del marco viejo
-        // if (frames[marco].file) free(frames[marco].file);
-        // if (frames[marco].tag) free(frames[marco].tag);
     }
 
+    // 4. Pedir página nueva (Swap In)
     int nro_bloque = nro_pagina;
     t_paquete* paquete = crear_paquete();
     paquete->codigo_operacion = PED_PAG;
@@ -321,32 +329,39 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
 
     op_code op = recibir_operacion(conexionStorage);
 
+    // --- MANEJO DE ERROR DEL STORAGE ---
     if (op != OP_SUCCESS) {
-        log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
+        log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d (Posible Out of Bounds)", nro_bloque);
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
         pthread_mutex_unlock(&mutex_memoria);
-        return; 
+        return false; // RETORNAMOS FALLO
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
     char* contenido_bloque = list_get(lista, 0);
     
-    // Copiar contenido a memoria física
+    // --- RETARDO SIMULADO ---
+    usleep(configWorker->retardo_memoria * 1000);
+
+    // 5. Actualizar Memoria
     memcpy(MEMORIA + marco * TAM_PAGINA, contenido_bloque, TAM_PAGINA);
 
+    // --- FIX MEMORY LEAK: Liberamos lo viejo AQUÍ ---
     if (frames[marco].file) free(frames[marco].file);
     if (frames[marco].tag) free(frames[marco].tag);
+    // ------------------------------------------------
 
     // Actualizar Frame
     frames[marco].ocupado = true;
-    frames[marco].modificado = false; // Recién traída de disco -> limpia
+    frames[marco].modificado = false; 
     frames[marco].uso = true;
     frames[marco].page_num = nro_pagina;
     frames[marco].timestamp = obtener_timestamp();
     frames[marco].file = strdup(formato->file_name);
     frames[marco].tag  = strdup(formato->tag);
 
+    // Actualizar Tabla de Páginas
     char* clave_pag = string_itoa(nro_pagina);
     entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
 
@@ -363,8 +378,13 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     free(clave_pag);
     list_destroy_and_destroy_elements(lista, free);
 
+    // --- LOG OBLIGATORIO: ADD / ASIGNACIÓN ---
+    log_info(loggerWorker, "Query %d: - Memoria Add - File: %s - Tag: %s - Pagina: %d - Marco: %d",
+             query_actual->query_id, formato->file_name, formato->tag, nro_pagina, marco);
+             
     log_info(loggerWorker, "Query %d: Se asigna el Marco: %d a la Página: %d perteneciente al - File: %s - Tag: %s",
-        query_actual->query_id, marco, nro_pagina, formato->file_name, formato->tag);
+             query_actual->query_id, marco, nro_pagina, formato->file_name, formato->tag);
 
     pthread_mutex_unlock(&mutex_memoria);
+    return true; // ÉXITO
 }

@@ -1,6 +1,7 @@
 #include "globales.h"
 #include <stdlib.h>
 #include "configWorker.h"
+#include <pthread.h>
 
 // Conexiones globales
 int conexionMaster = 0;
