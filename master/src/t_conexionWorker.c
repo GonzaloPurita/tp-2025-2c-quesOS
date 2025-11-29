@@ -451,6 +451,12 @@ void* atenderWorker(void* arg){
             
             break; 
         }
+        case -1: {
+            log_error(loggerMaster, "Worker %s: conexión perdida", id);
+            conexionWorker->conectado = false;
+            pthread_exit(NULL);
+            break;
+        }
 
         default:
             log_warning(loggerMaster, "Worker %s: op_code desconocido %d", id, codigoOperacion);

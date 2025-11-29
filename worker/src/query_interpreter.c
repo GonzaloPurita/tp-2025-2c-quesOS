@@ -103,7 +103,7 @@ void* correr_query_en_hilo(void* arg) {
             break;
 
         case QUERY_ERROR:
-            log_error(loggerWorker, "## Query %d: Finalizada por error", q_id);
+            log_warning(loggerWorker, "## Query %d: Finalizada por error", q_id);
             notificar_error_a_master("Error de ejecución");
             break;
     }

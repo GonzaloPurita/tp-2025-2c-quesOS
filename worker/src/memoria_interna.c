@@ -58,7 +58,7 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
 
     // Si no existe la tabla, retornamos buffer vacio (o podrías manejar error)
     if (tabla == NULL) {
-        log_error(loggerWorker, "Error: Tabla de paginas no encontrada para lectura");
+        log_warning(loggerWorker, "Tabla de paginas no encontrada para lectura");
         return buffer; 
     }
 
@@ -119,7 +119,7 @@ void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
         free(clave_pag);
 
         if (entrada == NULL) {
-            log_error(loggerWorker, "Error: Intento de escritura en pagina %d no cargada", p);
+            log_warning(loggerWorker, "Intento de escritura en pagina %d no cargada", p);
             break;
         }
 
@@ -316,7 +316,7 @@ void pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     op_code op = recibir_operacion(conexionStorage);
 
     if (op != OP_SUCCESS) {
-        log_error(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
+        log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
         pthread_mutex_unlock(&mutex_memoria);
