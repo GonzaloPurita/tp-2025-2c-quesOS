@@ -159,31 +159,75 @@ t_query* buscarQueryConMenorPrioridad() {
 }
 
 void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
-    // 1) Logs y métricas
-    log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades", candidatoDesalojo->QCB->QID);
+    if (!candidatoDesalojo) {
+        log_error(loggerMaster, "realizarDesalojo: candidatoDesalojo NULL");
+        return;
+    }
 
-    // 2) Preparar datos para el desalojo
+    int qid = candidatoDesalojo->QCB->QID;
+
+    // 1) Verificar que la query siga en EXEC
+    bool sigue_en_exec = false;
+
+    pthread_mutex_lock(&mutex_cola_exec);
+    for (int i = 0; i < list_size(cola_exec); i++) {
+        t_query* it = list_get(cola_exec, i);
+        if (it->QCB->QID == qid) {
+            sigue_en_exec = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cola_exec);
+
+    if (!sigue_en_exec) {
+        log_warning(loggerMaster,
+            "realizarDesalojo: QID=%d ya no está en EXEC (terminó / error / desconexión). No se desaloja.",
+            qid);
+        return;
+    }
+
+    // 2) Reservar estructura de datos para el hilo de desalojo
     t_datos_desalojo* datos = malloc(sizeof(t_datos_desalojo));
+    if (!datos) {
+        log_error(loggerMaster, "realizarDesalojo: malloc fallo para QID=%d", qid);
+        return;
+    }
+
     datos->candidatoDesalojo = candidatoDesalojo;
     datos->nuevoQuery = nuevoQuery;
 
-    // 3) Buscar el worker que está ejecutando la víctima
-    datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->QID);
+    // 3) Buscar el worker que está ejecutando a la víctima
+    datos->worker = encontrarWorkerPorQid(qid);
     if (datos->worker == NULL) {
-        log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->QID);
+        log_warning(loggerMaster,
+            "realizarDesalojo: QID=%d ya no tiene worker asignado. No se desaloja.",
+            qid);
         free(datos);
         return;
     }
-    log_info(loggerMaster, "## Se desaloja la Query %d (p=%d) del Worker %s (fd=%d) - Motivo: PRIORIDAD",
-    candidatoDesalojo->QCB->QID,
-    candidatoDesalojo->prioridad_actual,
-    datos->worker->id,
-    datos->worker->fd);
-    // 4) Lanzar hilo que hace el desalojo
+
+    // 4) Logs coherentes (ahora que sabemos que realmente se puede desalojar)
+    log_info(loggerMaster,
+        "## (%d) - Query desalojada por Prioridades", qid);
+
+    log_info(loggerMaster,
+        "## Se desaloja la Query %d (p=%d) del Worker %s (fd=%d) - Motivo: PRIORIDAD",
+        qid,
+        candidatoDesalojo->prioridad_actual,
+        datos->worker->id,
+        datos->worker->fd);
+
+    // 5) Lanzar hilo que hace el desalojo
     pthread_t hiloDesalojo;
-    pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
+    if (pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos) != 0) {
+        log_error(loggerMaster,
+            "realizarDesalojo: pthread_create fallo para QID=%d", qid);
+        free(datos);
+        return;
+    }
     pthread_detach(hiloDesalojo);
 }
+
 
 void* desalojar(void* arg) {
     t_datos_desalojo* d = (t_datos_desalojo*) arg;
