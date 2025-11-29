@@ -159,15 +159,32 @@ t_query* buscarQueryConMenorPrioridad() {
 }
 
 void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
-    // 1) Logs y métricas
+    // 1) Verificar que la query víctima todavía esté en EXEC
+    pthread_mutex_lock(&mutex_cola_exec);
+    bool victima_en_exec = false;
+    for (int i = 0; i < list_size(cola_exec); i++) {
+        t_query* q = list_get(cola_exec, i);
+        if (q->QCB->QID == candidatoDesalojo->QCB->QID) {
+            victima_en_exec = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cola_exec);
+    
+    if (!victima_en_exec) {
+        log_debug(loggerMaster, "Query %d ya no está en EXEC, no se puede desalojar", candidatoDesalojo->QCB->QID);
+        return;
+    }
+
+    // 2) Logs y métricas
     log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades", candidatoDesalojo->QCB->QID);
 
-    // 2) Preparar datos para el desalojo
+    // 3) Preparar datos para el desalojo
     t_datos_desalojo* datos = malloc(sizeof(t_datos_desalojo));
     datos->candidatoDesalojo = candidatoDesalojo;
     datos->nuevoQuery = nuevoQuery;
 
-    // 3) Buscar el worker que está ejecutando la víctima
+    // 4) Buscar el worker que está ejecutando la víctima
     datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->QID);
     if (datos->worker == NULL) {
         log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->QID);
@@ -197,24 +214,36 @@ void* desalojar(void* arg) {
 
    // 2) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
     sem_wait(&d->worker->semaforo);
-   // 3) Movemos las queries entre colas
-
+    
+   // 3) CRÍTICO: Bloquear TODOS los mutex para hacer el cambio atómico
+   //    Esto previene que el planificador vea un estado inconsistente
+    pthread_mutex_lock(&mutex_workers);
     pthread_mutex_lock(&mutex_cola_exec);
+    pthread_mutex_lock(&mutex_cola_ready);
+    
+    // Actualizar qid_actual del worker
+    d->worker->qid_actual = d->nuevoQuery->QCB->QID;
+    
+    // Mover las queries entre colas
     list_remove_element(cola_exec, d->candidatoDesalojo);
     list_add(cola_exec, d->nuevoQuery);
-    pthread_mutex_unlock(&mutex_cola_exec);
-    
-    pthread_mutex_lock(&mutex_cola_ready);
     list_remove_element(cola_ready, d->nuevoQuery);
     agregarAReadyPorPrioridad(d->candidatoDesalojo);
+    
+    // Liberar todos los mutex en orden inverso
     pthread_mutex_unlock(&mutex_cola_ready);
+    pthread_mutex_unlock(&mutex_cola_exec);
+    pthread_mutex_unlock(&mutex_workers);
 
     actualizarMetricas(Q_EXEC, Q_READY, d->candidatoDesalojo);
     actualizarMetricas(Q_READY, Q_EXEC, d->nuevoQuery);
     
-    // 4) Mandamos la query nueva a ese worker
+    // 4) Mandamos la query nueva a ese worker (sin actualizar qid_actual porque ya lo hicimos)
     log_debug(loggerMaster, "Enviando nueva QID=%d al Worker %s (fd=%d) tras desalojo", d->nuevoQuery->QCB->QID, d->worker->id, d->worker->fd);
-    enviarQueryAWorkerEspecifico(d->nuevoQuery, d->worker);
+    log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", 
+             d->nuevoQuery->QCB->QID, d->nuevoQuery->prioridad_actual, d->worker->id);
+    enviarQCB(d->worker->fd, d->nuevoQuery->QCB, d->nuevoQuery->path); 
+    sem_post(&esperarQuery);
 
     free(d);
     return NULL;
