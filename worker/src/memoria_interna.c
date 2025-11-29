@@ -56,13 +56,37 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
     free(clave_tabla);
 
+    // Si no existe la tabla, retornamos buffer vacio (o podrías manejar error)
+    if (tabla == NULL) {
+        log_error(loggerWorker, "Error: Tabla de paginas no encontrada para lectura");
+        return buffer; 
+    }
+
     for (int p = pagina_inicio; p <= pagina_fin; p++) {
         char* clave_pag = string_itoa(p);
         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
         free(clave_pag);
 
+        if (entrada == NULL || !entrada->presente || entrada->indice_frame == -1) {
+            log_warning(loggerWorker, "Intentando leer página %d no presente en RAM (Frame %d)", 
+                      p, (entrada ? entrada->indice_frame : -99));
+            // por ahora seguimos para no romper todo, pero podrimos abortar o rellenar con ceros
+            // si pasa esto es q 'pedir_pagina_a_storage' no se llamó antes.
+            
+            // Avanzamos los contadores para que el bucle no se desincronice
+            int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
+            bytes_restantes -= bytes_a_usar;
+            posicion_buffer += bytes_a_usar;
+            offset = 0;
+            continue; 
+        }
+
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
+
+        entrada->uso = true;
+        frames[frame].uso = true;
+        frames[frame].timestamp = obtener_timestamp();
 
         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset; // los bytes a usar van ser los que quedan o los que entran en la página
 

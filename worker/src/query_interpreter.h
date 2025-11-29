@@ -53,6 +53,11 @@ typedef struct {
     int pc_inicial;    
 } t_query_context;
 
+typedef struct {
+    int query_id;
+    char* path_script;
+} t_hilo_args;
+
 extern t_query_context* query_actual;
 
 void recibir_queries();
