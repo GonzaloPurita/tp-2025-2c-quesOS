@@ -115,7 +115,7 @@ void enviarQueryAWorker(t_query* query) {
              query->QCB->QID, query->prioridad_actual, conexionWorker->id);
     
     enviarQCB(conexionWorker->fd, query->QCB, query->path);
-    sem_post(&esperarQuery);
+    sem_post(&conexionWorker->esperarQuery);
 }
 
 void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWorker) {
@@ -124,7 +124,7 @@ void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWork
     pthread_mutex_unlock(&mutex_workers);
     log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", query->QCB->QID, query->prioridad_actual, conexionWorker->id);
     enviarQCB(conexionWorker->fd, query->QCB, query->path); 
-    sem_post(&esperarQuery);
+    sem_post(&conexionWorker->esperarQuery);
 }
 
 t_conexionWorker* obtenerWorkerLibre() {

@@ -47,6 +47,13 @@ int worker_registrar(char* id, int fd) {
         return 0;
     }
 
+    if (sem_init(&w->esperarQuery, 0, 0) != 0) {
+        log_error(loggerMaster, "worker_registrar: sem_init esperar query fallo para worker %s", id_copy);
+        free(w->id);
+        free(w);
+        return 0;
+    }
+
     pthread_mutex_lock(&mutex_workers);
     if (!LISTA_WORKERS) {
         LISTA_WORKERS = list_create();
@@ -219,7 +226,7 @@ void* atenderWorker(void* arg){
     pthread_mutex_unlock(&mutex_workers);
 
     if (libre) {
-        sem_wait(&esperarQuery);
+        sem_wait(&conexionWorker->esperarQuery);
 }
       
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
