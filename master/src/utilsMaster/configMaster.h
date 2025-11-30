@@ -18,7 +18,7 @@ typedef struct {
 extern t_config_master* configMaster;
 extern t_log* loggerMaster;
 
-void iniciar_config();
+void iniciar_config(char*);
 void liberar_config();
 
 #endif /* CONFIGURACION_MASTER */

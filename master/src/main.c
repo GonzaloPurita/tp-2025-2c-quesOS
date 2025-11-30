@@ -1,7 +1,9 @@
 #include "main.h"
 
 int main(int argc, char* argv[]) {
-    iniciar_config();              // crea loggerMaster también
+    char* archivoConfiguracion = argv[1];
+
+    iniciar_config(archivoConfiguracion);   // crea loggerMaster también
     inicializarListasQueries();
     iniciarConexionesMaster();     // levanta el server y el aceptador
     return 0;

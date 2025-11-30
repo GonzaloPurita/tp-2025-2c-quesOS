@@ -3,9 +3,9 @@
 t_config_master* configMaster;
 t_log* loggerMaster;
 
-void iniciar_config() {
+void iniciar_config(char* ruta_config) {
     configMaster = malloc(sizeof(t_config_master));
-    t_config* config = config_create("master.config");
+    t_config* config = config_create(ruta_config);
 
     configMaster->algoritmo_planificacion = strdup(config_get_string_value(config, "ALGORITMO_PLANIFICACION"));
     configMaster->log_level = strdup(config_get_string_value(config, "LOG_LEVEL"));
