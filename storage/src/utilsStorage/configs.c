@@ -19,6 +19,8 @@ void inicializarConfigStorage(char* archivoConfiguracion) {
     configStorage->punto_montaje = strdup(config_get_string_value(config, "PUNTO_MONTAJE"));
     configStorage->log_level = strdup(config_get_string_value(config, "LOG_LEVEL"));
 
+    loggerStorage = log_create("storage.log", "Storage", 1, log_level_from_string(configStorage->log_level));
+
     // Numericos
     configStorage->puerto_escucha = config_get_int_value(config, "PUERTO_ESCUCHA");
     configStorage->retardo_operacion = config_get_int_value(config, "RETARDO_OPERACION");
@@ -36,8 +38,6 @@ void inicializarConfigStorage(char* archivoConfiguracion) {
     }
     
     config_destroy(config);
-
-    loggerStorage = log_create("storage.log", "Storage", 1, log_level_from_string(configStorage->log_level));
 }
 
 void incializarSuperblock() {
