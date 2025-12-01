@@ -19,7 +19,7 @@ void inicializarConfigStorage(char* archivoConfiguracion) {
     configStorage->punto_montaje = strdup(config_get_string_value(config, "PUNTO_MONTAJE"));
     configStorage->log_level = strdup(config_get_string_value(config, "LOG_LEVEL"));
 
-    loggerStorage = log_create("storage.log", "Storage", 1, log_level_from_string(configStorage->log_level));
+    loggerStorage = log_create("/home/utnso/tp-2025-2c-quesOS/storage/storage.log", "Storage", 1, log_level_from_string(configStorage->log_level));
 
     // Numericos
     configStorage->puerto_escucha = config_get_int_value(config, "PUERTO_ESCUCHA");
