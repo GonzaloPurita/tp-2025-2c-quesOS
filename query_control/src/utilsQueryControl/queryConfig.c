@@ -14,7 +14,7 @@ void iniciar_config(char* path, char* id) {
     configQueryControl->puerto_master = config_get_int_value(config, "PUERTO_MASTER");
 
     config_destroy(config);
-    loggerQueryControl = log_create("queryControl.log", "Query_Control", 1, log_level_from_string(configQueryControl->log_level));
+    loggerQueryControl = log_create("/home/utnso/tp-2025-2c-quesOS/query_control/queryControl.log", "Query_Control", 1, log_level_from_string(configQueryControl->log_level));
 }
 
 void liberar_config() {
