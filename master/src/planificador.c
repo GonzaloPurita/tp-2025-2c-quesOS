@@ -103,12 +103,12 @@ void planificarSinDesalojo() {
 }
 
 void enviarQueryAWorker(t_query* query) {
-    pthread_mutex_lock(&mutex_workers);
     t_conexionWorker* conexionWorker = obtenerWorkerLibre();
     if (!conexionWorker) {
         log_error(loggerMaster, "No hay workers libres!");
         return;
     }
+    pthread_mutex_lock(&mutex_workers);
     conexionWorker->qid_actual = query->QCB->QID;
     pthread_mutex_unlock(&mutex_workers);
     log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", 
@@ -139,7 +139,6 @@ t_conexionWorker* obtenerWorkerLibre() {
     return w;
 }
 
-
 t_query* buscarQueryConMenorPrioridad() {
     t_query* victima = NULL;
 
@@ -160,60 +159,18 @@ t_query* buscarQueryConMenorPrioridad() {
 }
 
 void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
-    if (!candidatoDesalojo) {
-        log_error(loggerMaster, "realizarDesalojo: candidatoDesalojo NULL");
-        return;
-    }
+    // 1) Logs y métricas
+    log_info(loggerMaster, "## (%d) - Query desalojada por Prioridades", candidatoDesalojo->QCB->QID);
 
-    // Saco todo de las colas
-    pthread_mutex_lock(&mutex_cola_exec);
-    bool eliminadoExec = list_remove_element(cola_exec, candidatoDesalojo);
-    if (!eliminadoExec) {
-        log_warning(loggerMaster,
-            "realizarDesalojo: QID=%d ya no está en EXEC (terminó / error / desconexión). No se desaloja.",
-            candidatoDesalojo->QCB->QID);
-        pthread_mutex_unlock(&mutex_cola_exec);
-        return;
-    }
-    list_add(cola_exec, nuevoQuery);
-    nuevoQuery->estado = Q_EXEC;
-    pthread_mutex_unlock(&mutex_cola_exec);
-
-    pthread_mutex_lock(&mutex_cola_ready);
-    bool eliminadoReady = list_remove_element(cola_ready, nuevoQuery);
-    if (!eliminadoReady) {
-        log_warning(loggerMaster,
-            "realizarDesalojo: QID=%d ya no está en EXEC (terminó / error / desconexión). No se desaloja.",
-            nuevoQuery->QCB->QID);
-        pthread_mutex_unlock(&mutex_cola_ready);
-        pthread_mutex_lock(&mutex_cola_exec);
-        list_remove_element(cola_exec, nuevoQuery);
-        list_add(cola_exec, candidatoDesalojo);
-        pthread_mutex_unlock(&mutex_cola_exec);
-        return;
-    }
-    agregarAReadyPorPrioridad(candidatoDesalojo);
-    pthread_mutex_unlock(&mutex_cola_ready);
-
-
-    // 2) Reservar estructura de datos para el hilo de desalojo
-    // TODO: Devolver todo a como estaba
+    // 2) Preparar datos para el desalojo
     t_datos_desalojo* datos = malloc(sizeof(t_datos_desalojo));
-    if (!datos) {
-        log_error(loggerMaster, "realizarDesalojo: malloc fallo para QID=%d", candidatoDesalojo->QCB->QID);
-        return;
-    }
-
     datos->candidatoDesalojo = candidatoDesalojo;
     datos->nuevoQuery = nuevoQuery;
 
-    // 3) Buscar el worker que está ejecutando a la víctima
-    // TODO: Devolver todo a como estaba
+    // 3) Buscar el worker que está ejecutando la víctima
     datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->QID);
     if (datos->worker == NULL) {
-        log_warning(loggerMaster,
-            "realizarDesalojo: QID=%d ya no tiene worker asignado. No se desaloja.",
-            candidatoDesalojo->QCB->QID);
+        log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->QID);
         free(datos);
         return;
     }
@@ -230,7 +187,6 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     // pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
     // pthread_detach(hiloDesalojo);
 }
-
 
 void* desalojar(void* arg) {
     t_datos_desalojo* d = (t_datos_desalojo*) arg;
@@ -261,10 +217,14 @@ void* desalojar(void* arg) {
     agregarAReadyPorPrioridad(d->candidatoDesalojo);
     pthread_mutex_unlock(&mutex_cola_ready);
 
-    // 3) Mandamos la query nueva a ese worker
+    actualizarMetricas(Q_EXEC, Q_READY, d->candidatoDesalojo);
+    actualizarMetricas(Q_READY, Q_EXEC, d->nuevoQuery);
+    
+    // 4) Mandamos la query nueva a ese worker
     log_debug(loggerMaster, "Enviando nueva QID=%d al Worker %s (fd=%d) tras desalojo", d->nuevoQuery->QCB->QID, d->worker->id, d->worker->fd);
     enviarQueryAWorkerEspecifico(d->nuevoQuery, d->worker);
 
     free(d);
     return NULL;
 }
+
