@@ -256,16 +256,16 @@ void* atenderWorker(void* arg){
 
             // 1) Actualizar PC en la query víctima (ya la movimos a READY en realizarDesalojo)
             int actualizado = 0;
-            pthread_mutex_lock(&mutex_cola_exec);
-            for (int i = 0; i < list_size(cola_exec); i++) {
-                t_query* q = list_get(cola_exec, i);
+            pthread_mutex_lock(&mutex_cola_ready);
+            for (int i = 0; i < list_size(cola_ready); i++) {
+                t_query* q = list_get(cola_ready, i);
                 if (q->QCB->QID == qid) {
                     q->QCB->PC = pc;
                     actualizado = 1;
                     break;
                 }
             }
-            pthread_mutex_unlock(&mutex_cola_exec);
+            pthread_mutex_unlock(&mutex_cola_ready);
 
             if (!actualizado) {
                 log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY (posible desconexión de QC)", qid);

@@ -521,7 +521,46 @@ void ejecutar_read(t_instruccion* inst) {
     destruir_formato(formato);
 }
 
-void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
+// void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
+//     char* recurso = inst->parametros[0];       
+    
+//     t_formato* formato = mapear_formato(recurso);
+//     int direccion_base = atoi(inst->parametros[1]);
+//     char* valor  = inst->parametros[2];
+//     int tamanio_valor = strlen(valor); //lo que ocupa el string
+
+//     // calculo las paginas necesarias
+//     t_list* paginas = paginas_necesarias(direccion_base, tamanio_valor);
+
+//     log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
+
+//     // para cada página, verificamos si esta en memoria
+//     for (int i = 0; i < list_size(paginas); i++) { 
+//         int* nro_pagina = list_get(paginas, i);
+//         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
+
+//         if (!en_memoria) {
+//             log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
+//             pedir_pagina_a_storage(formato, *nro_pagina);
+//         }
+//     }
+
+//     escribir_en_memoria(formato, direccion_base, valor);
+
+//     // informo al Master que se hizo el WRITE
+//     t_paquete* respuesta = crear_paquete();
+//     respuesta->codigo_operacion = OP_WRITE;
+//     agregar_a_paquete(respuesta, valor, strlen(valor) + 1);
+//     enviar_paquete(respuesta, conexionMaster);
+//     eliminar_paquete(respuesta);
+
+//     log_info(loggerWorker, "## Query %d: - Instrucción realizada: WRITE %s:%s base=%d valor=%s", query_actual->query_id, formato->file_name, formato->tag, direccion_base, valor);
+
+//     list_destroy_and_destroy_elements(paginas, free);
+//     destruir_formato(formato);
+// }
+
+void ejecutar_write(t_instruccion* inst) {   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
     char* recurso = inst->parametros[0];       
     
     t_formato* formato = mapear_formato(recurso);
@@ -530,22 +569,40 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
     int tamanio_valor = strlen(valor); //lo que ocupa el string
 
     // calculo las paginas necesarias
-    t_list* paginas = paginas_necesarias(direccion_base, tamanio_valor);
+    int pagina_inicio = direccion_base / TAM_PAGINA;
+    int pagina_fin = (direccion_base + tamanio_valor - 1) / TAM_PAGINA;
+    int cant_paginas = pagina_fin - pagina_inicio + 1;
 
-    log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
+    log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", cant_paginas, formato->file_name, formato->tag, direccion_base, tamanio_valor);
 
-    // para cada página, verificamos si esta en memoria
-    for (int i = 0; i < list_size(paginas); i++) { 
-        int* nro_pagina = list_get(paginas, i);
-        bool en_memoria = esta_en_memoria(formato, *nro_pagina);
+    int bytes_restantes = tamanio_valor;
+    int posicion_valor = 0;
+    int nro_pagina_actual = pagina_inicio;
+    int offset = direccion_base % TAM_PAGINA;
+
+    // para cada página, verifico si esta en memoria Y escribo
+    while (bytes_restantes > 0) {
+        
+        // Calculo cuánto escribir en esta página
+        int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
+
+        bool en_memoria = esta_en_memoria(formato, nro_pagina_actual);
 
         if (!en_memoria) {
-            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
-            pedir_pagina_a_storage(formato, *nro_pagina);
+            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, nro_pagina_actual);
+            if (!pedir_pagina_a_storage(formato, nro_pagina_actual)) {
+                log_error(loggerWorker, "Fallo al traer pagina %d", nro_pagina_actual);
+                break; 
+            }
         }
-    }
 
-    escribir_en_memoria(formato, direccion_base, valor);
+        escribir_en_memoria(formato, nro_pagina_actual, offset, valor + posicion_valor, bytes_a_usar);
+
+        bytes_restantes -= bytes_a_usar;
+        posicion_valor += bytes_a_usar;
+        offset = 0; // Para las siguientes páginas, el offset siempre arranca en 0
+        nro_pagina_actual++;
+    }
 
     // informo al Master que se hizo el WRITE
     t_paquete* respuesta = crear_paquete();
@@ -556,7 +613,6 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: WRITE %s:%s base=%d valor=%s", query_actual->query_id, formato->file_name, formato->tag, direccion_base, valor);
 
-    list_destroy_and_destroy_elements(paginas, free);
     destruir_formato(formato);
 }
 
