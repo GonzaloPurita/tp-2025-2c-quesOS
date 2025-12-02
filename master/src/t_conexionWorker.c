@@ -118,6 +118,7 @@ int workers_disponibles(void) {
 t_conexionWorker* encontrarWorkerPorQid(int qid) {
     pthread_mutex_lock(&mutex_workers);
     t_conexionWorker* w = NULL;
+    
     for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
         t_conexionWorker* it = list_get(LISTA_WORKERS, i);
         if (it->conectado && it->qid_actual == qid) { w = it; break; }
