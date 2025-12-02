@@ -2,7 +2,7 @@
 
 int main(int argc, char* argv[]) {
     char* archivoConfiguracion = argv[1];
-    // char* archivoConfiguracion = "configs/master-est.config";
+    // char* archivoConfiguracion = "configs/master-sto.config";
 
     iniciar_config(archivoConfiguracion);   // crea loggerMaster también
     inicializarListasQueries();

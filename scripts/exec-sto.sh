@@ -6,7 +6,7 @@ CMDS=(
     "./../storage/scripts/exec-sto.sh"
     "./../master/scripts/exec-sto.sh"
     "./../worker/scripts/exec-sto.sh"
-    "./../query_control/scripts/exec-sto.sh"
+    "./../query_control/scripts/exec-sto-1.sh"
 )
 
 for CMD in "${CMDS[@]}"; do

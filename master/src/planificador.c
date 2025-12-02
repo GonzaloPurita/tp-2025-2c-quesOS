@@ -152,11 +152,6 @@ t_query* buscarQueryConMenorPrioridad() {
 
     log_debug(loggerMaster, "Buscando víctima entre %d queries en EXEC", n);
 
-    t_query* q1 = list_get(cola_exec, 0);
-    t_query* q2 = list_get(cola_exec, 1);
-
-    log_debug(loggerMaster, "Comparando primeras dos queries en EXEC: QID=%d (p=%d) vs QID=%d (p=%d)", q1->QCB->QID, q1->prioridad_actual, q2->QCB->QID, q2->prioridad_actual);
-
     for (int i = 0; i < n; i++) {
         t_query* q = list_get(cola_exec, i);
 
