@@ -157,7 +157,7 @@ t_estado_query ejecutar_query(char* path_query) {
                 log_error(loggerWorker, "## Query %d: Abortando ejecución por error previo", query_actual->query_id);
                 notificar_error_a_master("Error durante la ejecución de la query");
                 estado_salida = QUERY_ERROR;
-                break;
+                return estado_salida;
             }
 
             log_info(loggerWorker, "## Query %d: FETCH - Program Counter : %d - %s", query_actual->query_id, PC_ACTUAL, linea);
@@ -165,7 +165,18 @@ t_estado_query ejecutar_query(char* path_query) {
             t_instruccion* inst = decode(linea);
             execute(inst);
             destruir_instruccion(inst);
-            
+
+            pthread_mutex_lock(&mutex_error);
+            error_flag = query_error_flag;
+            pthread_mutex_unlock(&mutex_error);
+            if(error_flag) {
+                estado_salida = QUERY_ERROR;
+                pthread_mutex_lock(&mutex_error);
+                query_error_flag = false;
+                pthread_mutex_unlock(&mutex_error);
+                return estado_salida;
+            }
+
             PC_ACTUAL++;
 
             pthread_mutex_lock(&mutex_interrupt);
@@ -174,7 +185,7 @@ t_estado_query ejecutar_query(char* path_query) {
             if (interrupt) {
                 log_warning(loggerWorker, "## Query %d: Interrupción detectada en PC: %d", query_actual->query_id, PC_ACTUAL);
                 estado_salida = QUERY_DESALOJADA;
-                break;
+                return estado_salida;
             }
         }
         linea_actual++;
@@ -313,7 +324,15 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "CREATE");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+        log_debug(loggerWorker, "Error rta CREATE %d", rta);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+    }
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
 }
@@ -336,13 +355,20 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
-    op_code rta1 = recibir_operacion(conexionStorage);
+    op_code rta = recibir_operacion(conexionStorage);
     t_list* rtaP = recibir_paquete(conexionStorage);
-    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE 1: %d", rta1);
+    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE 1: %d", rta);
 
-    manejar_respuesta_storage(rta1, "TRUNCATE");
+    manejar_respuesta_storage(rta, "TRUNCATE");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
+    }
 
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
@@ -370,11 +396,18 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "TAG");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
-
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato_origen);
     destruir_formato(formato_destino);
+
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
+    }
 }
 
 void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
@@ -394,8 +427,14 @@ void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "DELETE");
 
-
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
+    }
 
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
@@ -432,7 +471,14 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     
     manejar_respuesta_storage(rta, "COMMIT");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
+    }
 
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);

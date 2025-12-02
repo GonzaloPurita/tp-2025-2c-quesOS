@@ -15,7 +15,7 @@ void iniciar_config(char* ruta_config) {
     configMaster->tiempo_aging = config_get_int_value(config, "TIEMPO_AGING");
 
     config_destroy(config);
-    loggerMaster = log_create("/home/utnso/tp-2025-2c-quesOS/master/master.log", "Master", 1, log_level_from_string(configMaster->log_level));
+    loggerMaster = log_create("master.log", "Master", 1, log_level_from_string(configMaster->log_level));
 }
 
 void liberar_config() {

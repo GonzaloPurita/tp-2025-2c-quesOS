@@ -31,7 +31,7 @@ void iniciar_config(char* path) {
     configWorker->tam_memoria = config_get_int_value(config, "TAM_MEMORIA");
     configWorker->retardo_memoria = config_get_int_value(config, "RETARDO_MEMORIA");
 
-    loggerWorker = log_create("/home/utnso/tp-2025-2c-quesOS/worker/worker.log", "Worker", true, log_level_from_string(configWorker->log_level));
+    loggerWorker = log_create("worker.log", "Worker", true, log_level_from_string(configWorker->log_level));
 
     config_destroy(config);
 }
