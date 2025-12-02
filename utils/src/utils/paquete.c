@@ -54,25 +54,23 @@ void* serializar_paquete(t_paquete* paquete, int bytes) {
 	int desplazamiento = 0;
 
 	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
-	desplazamiento += sizeof(int);
+	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento += sizeof(int);
+	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
-	desplazamiento += paquete->buffer->size;
+	desplazamiento+= paquete->buffer->size;
 
 	return magic;
 }   
 
 t_list* recibir_paquete(int socket_cliente) {
 	int size;
-	int tamanio;
 	int desplazamiento = 0;
-	
-	t_list* valores = list_create();
-	
 	void * buffer;
-	buffer = recibir_buffer(&size, socket_cliente);
+	t_list* valores = list_create();
+	int tamanio;
 
+	buffer = recibir_buffer(&size, socket_cliente);
 	while(desplazamiento < size)
 	{
 		memcpy(&tamanio, buffer + desplazamiento, sizeof(int));
@@ -82,13 +80,12 @@ t_list* recibir_paquete(int socket_cliente) {
 		desplazamiento+=tamanio;
 		list_add(valores, valor);
 	}
-
 	free(buffer);
 	return valores;
 }
 
 void* recibir_buffer(int* size, int socket_cliente) {
-    void* buffer;
+    void * buffer;
 
     // 1. Recibimos el tamaño
     if (recv(socket_cliente, size, sizeof(int), MSG_WAITALL) <= 0) {

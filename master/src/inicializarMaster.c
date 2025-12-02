@@ -122,7 +122,6 @@ void* atenderCliente(void* arg) {
         case SUBMIT_QUERY: {
             // Recibo la query: [ int prioridad ][ int len ][ char[len] path ]
             t_list* datos = recibir_paquete(fd);
-
             if (!datos || list_size(datos) < 3) {
                 log_error(loggerMaster, "fd=%d: SUBMIT_QUERY mal formado (items=%d)", fd, datos ? list_size(datos) : -1);
                 if (datos) list_destroy_and_destroy_elements(datos, free);
@@ -131,12 +130,11 @@ void* atenderCliente(void* arg) {
             }
             
             int prioridad = *(int*) list_get(datos, 0);
-            int len = *(int*) list_get(datos, 1);
+            int len       = *(int*) list_get(datos, 1);
             char* path_in = (char*) list_get(datos, 2);
 
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
-
             // Genero QID
             int qid = 0;
             pthread_mutex_lock(&mutex_qid);
