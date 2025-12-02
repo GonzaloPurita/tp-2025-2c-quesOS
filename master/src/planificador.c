@@ -180,10 +180,12 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     candidatoDesalojo->prioridad_actual,
     datos->worker->id,
     datos->worker->fd);
+
+    desalojar((void*) datos);
     // 4) Lanzar hilo que hace el desalojo
-    pthread_t hiloDesalojo;
-    pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
-    pthread_detach(hiloDesalojo);
+    // pthread_t hiloDesalojo;
+    // pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
+    // pthread_detach(hiloDesalojo);
 }
 
 void* desalojar(void* arg) {
@@ -198,8 +200,13 @@ void* desalojar(void* arg) {
 
    // 2) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
     sem_wait(&d->worker->semaforo);
-   // 3) Movemos las queries entre colas
 
+    if(!d->worker->conectado) { // Validamos que no se haya desconectado durante el desalojo.
+        log_error(loggerMaster, "Desalojo abortado: Worker %s desconectado", d->worker->id);
+        return NULL;
+    }
+
+   // 3) Movemos las queries entre colas
     pthread_mutex_lock(&mutex_cola_exec);
     list_remove_element(cola_exec, d->candidatoDesalojo);
     list_add(cola_exec, d->nuevoQuery);
