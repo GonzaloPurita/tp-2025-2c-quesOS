@@ -174,6 +174,7 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
         free(datos);
         return;
     }
+    
     log_info(loggerMaster, "## Se desaloja la Query %d (p=%d) del Worker %s (fd=%d) - Motivo: PRIORIDAD",
     candidatoDesalojo->QCB->QID,
     candidatoDesalojo->prioridad_actual,

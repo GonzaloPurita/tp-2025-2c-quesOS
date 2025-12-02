@@ -23,6 +23,7 @@ int worker_registrar(char* id, int fd) {
     if (!id) return 0;
 
     t_conexionWorker* w = malloc(sizeof(*w));
+    
     if (!w) {
         log_error(loggerMaster, "worker_registrar: malloc fallo");
         return 0;
@@ -55,8 +56,11 @@ int worker_registrar(char* id, int fd) {
     }
 
     pthread_mutex_lock(&mutex_workers);
+    
     if (!LISTA_WORKERS) {
+
         LISTA_WORKERS = list_create();
+        
         if (!LISTA_WORKERS) {
             log_error(loggerMaster, "worker_registrar: list_create fallo");
             pthread_mutex_unlock(&mutex_workers);
@@ -66,8 +70,11 @@ int worker_registrar(char* id, int fd) {
             return 0;
         }
     }
+
     list_add(LISTA_WORKERS, w);
+
     int list_size_now = list_size(LISTA_WORKERS);
+
     pthread_mutex_unlock(&mutex_workers);
 
     pthread_t hiloWORKER;
