@@ -481,6 +481,7 @@ void* atenderWorker(void* arg){
         case -1: {
             log_error(loggerMaster, "Worker %s: conexión perdida", id);
             conexionWorker->conectado = false;
+            sem_post(&conexionWorker->semaforo); // -> Podría desconectarse durante un desalojo -> Deadlock
             pthread_exit(NULL);
             break;
         }

@@ -11,8 +11,10 @@ t_list* paginas_necesarias(int direccion_base, int tamanio);
 bool esta_en_memoria(t_formato* formato, int nro_pagina);
 bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
 char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio);
-void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor);
+//void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor);
+void escribir_en_memoria(t_formato* formato, int nro_pagina, int offset, char* origen, int bytes_a_usar);
 void guardar_paginas_modificadas(void);
 void notificar_master_desalojo(int pc_actual);
+//void escribir_fragmento_en_memoria(t_formato* f, int nro_pag, int offset, char* origen, int cant);
 
 #endif
