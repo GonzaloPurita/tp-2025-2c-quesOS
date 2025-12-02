@@ -2,6 +2,7 @@
 
 int main(int argc, char* argv[]) {
     char* archivoConfiguracion = argv[1];
+    // char* archivoConfiguracion = "configs/master-plani-aging.config";
 
     iniciar_config(archivoConfiguracion);   // crea loggerMaster también
     inicializarListasQueries();

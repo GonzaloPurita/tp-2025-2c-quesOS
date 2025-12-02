@@ -386,6 +386,9 @@ op_code validarBloqueLogico(char* nombreFile, char* nombreTag, int numeroBloqueL
         log_error(loggerStorage, "Error validando bloque lógico %d de %s:%s, no existe bloque físico asociado", numeroBloqueLogico, nombreFile, nombreTag);
         return ERROR_OUT_OF_BOUNDS;
     }
+    if(bloqueFisico == 0) {
+        return OP_SUCCESS;
+    }
 
     char* contenido = leerBloqueFisico(bloqueFisico);
     if (contenido == NULL) {

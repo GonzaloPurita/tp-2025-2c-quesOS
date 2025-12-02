@@ -6,7 +6,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/bin/${workspaceFolderBasename}",
-      "args": ["storage.config"],
+      "args": ["./configs/storage-plani.config"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
