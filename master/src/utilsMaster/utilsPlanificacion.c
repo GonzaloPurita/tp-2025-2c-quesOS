@@ -1,5 +1,9 @@
 #include "utilsPlanificacion.h"
 
+int idTemporizador = 0;
+
+void* aging(void* arg);
+
 bool cmp_query_por_prioridad(void* _a, void* _b) {
     t_query* a = (t_query*) _a;
     t_query* b = (t_query*) _b;
@@ -51,6 +55,49 @@ void* hilo_aging(void* arg) {
         usleep(ms * 1000);
         AGING_TICK_GLOBAL++;
         aplicar_aging_ready();
+    }
+    return NULL;
+}
+
+void iniciarAging(t_query* q){
+    t_info_aging* info = malloc(sizeof(t_info_aging));
+
+    pthread_mutex_lock(&mutex_idTemporizador);
+    q->idTemporizador = idTemporizador++;
+    info->idTemporizador = q->idTemporizador;
+    pthread_mutex_unlock(&mutex_idTemporizador);
+    info->query = q;
+
+    pthread_t hilo;
+    pthread_create(&hilo, NULL, aging, info);
+    pthread_detach(hilo);
+}
+
+void* aging(void* arg){
+    t_info_aging* info = (t_info_aging*) arg;
+    t_query* q = info->query;
+    int id = info->idTemporizador;
+    free(info);
+    const int ms = configMaster->tiempo_aging;
+    if (ms <= 0) return NULL;
+
+    usleep(ms * 1000);
+    if(q == NULL) return NULL;
+    if(id == q->idTemporizador) {
+        if(q->prioridad_actual > 0) {
+            int anterior = q->prioridad_actual;
+            q->prioridad_actual = anterior - 1; 
+
+            log_info(loggerMaster, "Cambio de prioridad de Query: “##<%d> Cambio de prioridad: <%d> - <%d>", q->QCB->QID, anterior, q->prioridad_actual);
+
+            pthread_mutex_lock(&mutex_cola_ready);
+            list_remove_element(cola_ready, q);
+            agregarAReadyPorPrioridad(q);
+            pthread_mutex_unlock(&mutex_cola_ready);
+            if(q->prioridad_actual > 0){
+                iniciarAging(q);
+            }
+        }
     }
     return NULL;
 }

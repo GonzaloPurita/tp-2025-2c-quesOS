@@ -3,6 +3,7 @@
 
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
+#include <utilsMaster/utilsPlanificacion.h>
 #include <t_query.h>
 #include <t_conexionWorker.h>
 #include <utils/qcb.h>

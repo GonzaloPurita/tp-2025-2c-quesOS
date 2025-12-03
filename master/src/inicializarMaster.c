@@ -92,15 +92,15 @@ void* atenderCliente(void* arg) {
                 return NULL;
             }
         
-            if (configMaster->tiempo_aging > 0 && !aging_started && configMaster->algoritmo_planificacion && strcmp(configMaster->algoritmo_planificacion, "PRIORIDADES") == 0) {
-                aging_started = 1;
-                pthread_t th_aging;
-                if (pthread_create(&th_aging, NULL, hilo_aging, NULL) != 0) {
-                    log_error(loggerMaster, "Error creando hilo de aging");
-                } else {
-                    pthread_detach(th_aging);
-                }
-            }
+            // if (configMaster->tiempo_aging > 0 && !aging_started && configMaster->algoritmo_planificacion && strcmp(configMaster->algoritmo_planificacion, "PRIORIDADES") == 0) {
+            //     aging_started = 1;
+            //     pthread_t th_aging;
+            //     if (pthread_create(&th_aging, NULL, hilo_aging, NULL) != 0) {
+            //         log_error(loggerMaster, "Error creando hilo de aging");
+            //     } else {
+            //         pthread_detach(th_aging);
+            //     }
+            // }
         
             int ok = 1;
             t_paquete* r = crear_paquete();
@@ -165,6 +165,7 @@ void* atenderCliente(void* arg) {
             else{
                 agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar
             }
+            iniciarAging(q);
             
 
             log_info(loggerMaster, "## Se conecta un Query Control para ejecutar la Query %s " "con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", 

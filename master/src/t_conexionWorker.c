@@ -310,6 +310,8 @@ void* atenderWorker(void* arg){
                 break;
             }
 
+            q->idTemporizador = -1;
+
             // 3) Guardar fd_qc antes de pasar la query a exit
             int fd_qc = q->fd_qc;
 
@@ -440,6 +442,7 @@ void* atenderWorker(void* arg){
                 break;
             }
             
+            q->idTemporizador = -1;
             int fd_qc = q->fd_qc;
             
             // muevo la query a EXIT
@@ -478,7 +481,7 @@ void* atenderWorker(void* arg){
             
             break; 
         }
-        case -1: {
+        case -1: { // TODO: Pasar proceso a EXIT
             log_error(loggerMaster, "Worker %s: conexión perdida", id);
             conexionWorker->conectado = false;
             sem_post(&conexionWorker->semaforo); // -> Podría desconectarse durante un desalojo -> Deadlock

@@ -13,6 +13,7 @@ pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_exec;
 pthread_mutex_t mutex_cola_exit;
 pthread_mutex_t mutex_queries;
+pthread_mutex_t mutex_idTemporizador;
 
 
 void inicializarSemaforos(void) {
@@ -22,6 +23,7 @@ void inicializarSemaforos(void) {
     pthread_mutex_init(&mutex_cola_exec, NULL);
     pthread_mutex_init(&mutex_cola_exit, NULL);
     pthread_mutex_init (&mutex_queries, NULL);
+    pthread_mutex_init (&mutex_idTemporizador, NULL);
 
     sem_init(&sem_workers_disponibles, 0, 0);
     sem_init(&rePlanificar, 0, 0);
@@ -40,4 +42,5 @@ void destruirSemaforos(void) {
     pthread_mutex_destroy(&mutex_cola_exec);
     pthread_mutex_destroy(&mutex_cola_exit);
     pthread_mutex_destroy(&mutex_queries);
+    pthread_mutex_destroy(&mutex_idTemporizador);
 }

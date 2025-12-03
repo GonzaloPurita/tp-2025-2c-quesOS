@@ -38,6 +38,7 @@ t_query* crearQuery(const char* path, int prioridad) {
     q->IDAging = AGING_TICK_GLOBAL;  // clave para no envejecer YA
     q->pc_actual = 0;
     q->estado = Q_READY;
+    q->idTemporizador = -1;
 
     pthread_mutex_unlock(&mutex_queries);
     return q;

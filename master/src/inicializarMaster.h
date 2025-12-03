@@ -4,6 +4,7 @@
 #include <t_conexionWorker.h>
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
+#include <utilsMaster/utilsPlanificacion.h>
 #include <utils/paquete.h>
 #include <planificador.h>
 

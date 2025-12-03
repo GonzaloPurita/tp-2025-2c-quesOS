@@ -5,7 +5,6 @@
 #include <utilsMaster/semaforos.h>
 #include <utilsMaster/configMaster.h>
 #include <utils/qcb.h>
-#include <utilsMaster/utilsPlanificacion.h>
 
 typedef enum { Q_READY, Q_EXEC, Q_EXIT } estado_query;
 
@@ -19,6 +18,7 @@ typedef struct {
     int prioridad_actual; // La que usa el scheduler y modifica el aging
     int pc_actual; // Para el desalojo
     int fd_qc; // Flujo de comunicacion para reenviarle al QC
+    int idTemporizador;
     estado_query estado; // OPCIONAL: Podemos guardar el estado en el que esta.
 }t_query;
 

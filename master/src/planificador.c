@@ -33,6 +33,7 @@ void planificarConDesalojoYAging() {
     t_conexionWorker* workerLibre = obtenerWorkerLibre();
 
     if (workerLibre != NULL) {
+        query->idTemporizador = -1;
         pthread_mutex_lock(&mutex_cola_ready);
         list_remove_element(cola_ready, query);
         pthread_mutex_unlock(&mutex_cola_ready);
@@ -75,6 +76,7 @@ void planificarConDesalojoYAging() {
 
     // Prioridad más BAJA es MEJOR. Desalojar si la nueva es mejor que la víctima.
     if (query->prioridad_actual < prioridadVictima) {
+        query->idTemporizador = -1;
         log_debug(loggerMaster, "Desalojo por prioridad");
         realizarDesalojo(candidatoDesalojo, query);
     }  else {
@@ -91,8 +93,9 @@ void planificarSinDesalojo() {
 
     // Saco la primer query de la cola de READY
     pthread_mutex_lock(&mutex_cola_ready); 
-    t_query* query = list_remove(cola_ready, 0); 
+    t_query* query = list_remove(cola_ready, 0);
     pthread_mutex_unlock(&mutex_cola_ready); 
+    query->idTemporizador = -1; 
 
     pthread_mutex_lock(&mutex_cola_exec); 
     list_add(cola_exec, query); 
@@ -229,6 +232,9 @@ void* desalojar(void* arg) {
     agregarAReadyPorPrioridad(d->candidatoDesalojo);
     pthread_mutex_unlock(&mutex_cola_ready);
 
+    d->candidatoDesalojo->idTemporizador = -1;
+    d->nuevoQuery->idTemporizador = -1;
+    iniciarAging(d->candidatoDesalojo);
     actualizarMetricas(Q_EXEC, Q_READY, d->candidatoDesalojo);
     actualizarMetricas(Q_READY, Q_EXEC, d->nuevoQuery);
     

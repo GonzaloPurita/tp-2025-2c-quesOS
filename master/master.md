@@ -167,6 +167,7 @@ typedef {
     int prioridad; // La prioridad que tiene
     int IDAging; // Se explica en la parte de AGING
     t_estado estado; // OPCIONAL: Podemos guardar el estado en el que esta.
+    int idTemporizador;
 }t_query;
 
 
