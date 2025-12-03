@@ -214,7 +214,7 @@ void* monitorear_query_control(void* arg) {
         if (cod_op <= 0) {
             // Query Control se desconectó
             log_warning(loggerMaster, "## Se desconecta un Query Control. Se finaliza la Query %d. Motivo: DESCONEXION", qid);
-            
+            list_destroy_and_destroy_elements(data, free);
             query_control_desconectado(qid);
             break;
         }
