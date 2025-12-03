@@ -544,9 +544,28 @@ void ejecutar_read(t_instruccion* inst) {
     }
 
     // 2. Leer de Memoria (Solo si todo cargó bien)
-    char* contenido = leer_desde_memoria(formato, direccion_base, tamanio);
+    op_code resultado_lectura;
+    char* contenido = leer_desde_memoria(formato, direccion_base, tamanio, &resultado_lectura);
     log_info(loggerWorker, "Contenido leído de memoria para READ %s dir_base=%d tam=%d: %s", recurso, direccion_base, tamanio, contenido);
 
+    
+    if(resultado_lectura != OP_SUCCESS) {
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+
+        char* motivo;
+
+        if(resultado_lectura == ERROR_OUT_OF_BOUNDS) {
+            motivo = "Lectura fuera de los limites";
+        }
+        else {
+            motivo = "Error desconocido durante la lectura";
+        }
+        notificar_error_a_master(motivo);
+        return;
+    }
+    
     // 3. Enviar respuesta al Master
     t_paquete* respuesta = crear_paquete();
     respuesta->codigo_operacion = OP_READ;

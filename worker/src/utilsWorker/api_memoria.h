@@ -6,11 +6,12 @@
 #include <stdbool.h>
 #include <commons/collections/list.h>
 #include "formato.h"
+#include <utils/paquete.h>
 
 t_list* paginas_necesarias(int direccion_base, int tamanio);
 bool esta_en_memoria(t_formato* formato, int nro_pagina);
-bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
-char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio);
+op_code pedir_pagina_a_storage(t_formato* formato, int nro_pagina);
+char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio, op_code* resultado);
 //void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor);
 void escribir_en_memoria(t_formato* formato, int nro_pagina, int offset, char* origen, int bytes_a_usar);
 void guardar_paginas_modificadas(void);

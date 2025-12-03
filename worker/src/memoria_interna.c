@@ -43,7 +43,7 @@ bool esta_en_memoria(t_formato* formato, int nro_pagina) {
     return entrada->presente;
 }
 
-char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
+char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio, op_code* resultado) {
     char* buffer = calloc(1, tamanio + 1);
 
     int pagina_inicio = direccion_base / TAM_PAGINA;
@@ -71,8 +71,9 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
             log_warning(loggerWorker, "Page Fault dentro de READ (Thrashing): Recuperando Página %d", p);
             
             // Llamamos a la función de carga (que ya tiene mutex y todo)
-            if (!pedir_pagina_a_storage(formato, p)) {
-                log_error(loggerWorker, "Error fatal recuperando página %d en lectura.", p);
+            *resultado = pedir_pagina_a_storage(formato, p);
+            if (*resultado != OP_SUCCESS) {
+                log_error(loggerWorker, "Error recuperando página %d en lectura.", p);
                 free(clave_pag);
                 free(buffer);
                 return NULL; // O manejar error
@@ -107,7 +108,7 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         posicion_buffer += bytes_a_usar;
         offset = 0;
     }
-
+    *resultado = OP_SUCCESS;
     return buffer;  
 }
 
@@ -370,7 +371,7 @@ int elegir_victima_CLOCKM() {
     return 0; 
 }
 
-bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
+op_code pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     pthread_mutex_lock(&mutex_memoria);
 
     // 1. Obtener/Crear Tabla
@@ -465,11 +466,15 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     op_code op = recibir_operacion(conexionStorage);
 
     if (op != OP_SUCCESS) {
-        log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d (Posible Out of Bounds)", nro_bloque);
+        if(op == ERROR_OUT_OF_BOUNDS) {
+            log_warning(loggerWorker, "Storage devolvió ERROR_OUT_OF_BOUNDS al pedir bloque %d", nro_bloque);
+        } else {
+            log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
+        }
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
         pthread_mutex_unlock(&mutex_memoria);
-        return false;
+        return op;
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
@@ -517,5 +522,5 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
              query_actual->query_id, marco, nro_pagina, formato->file_name, formato->tag);
 
     pthread_mutex_unlock(&mutex_memoria);
-    return true;
+    return OP_SUCCESS;
 }
