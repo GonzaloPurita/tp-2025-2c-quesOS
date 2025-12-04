@@ -328,7 +328,6 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
         pthread_mutex_lock(&mutex_error);
         query_error_flag = true;
         pthread_mutex_unlock(&mutex_error);
-        log_debug(loggerWorker, "Error rta CREATE %d", rta);
     }
     else {
         log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
