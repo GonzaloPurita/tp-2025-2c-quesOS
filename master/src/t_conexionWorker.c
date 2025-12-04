@@ -184,11 +184,13 @@ void worker_desconectar_por_fd(int fd) {
                 qid_en_ejecucion,
                 total_workers
             );
+            q->idTemporizador = -1;
 
             // notificar al Query Control
             t_paquete* paquete = crear_paquete();
             paquete->codigo_operacion = QUERY_FINALIZADA;
             agregar_a_paquete(paquete, &qid_en_ejecucion, sizeof(int));
+            agregar_a_paquete(paquete, "Worker desconectado", strlen("Worker desconectado") + 1);
             enviar_paquete(paquete, q->fd_qc);
             eliminar_paquete(paquete);
 
@@ -235,7 +237,7 @@ void* atenderWorker(void* arg){
 
     if (libre) {
         sem_wait(&conexionWorker->esperarQuery);
-}
+    }
       
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
@@ -314,6 +316,7 @@ void* atenderWorker(void* arg){
 
             // 3) Guardar fd_qc antes de pasar la query a exit
             int fd_qc = q->fd_qc;
+            
 
             // 4) Movemos la query a exit
             actualizarMetricas(Q_EXEC, Q_EXIT, q);
@@ -327,15 +330,15 @@ void* atenderWorker(void* arg){
             sem_post(&rePlanificar);
 
             // 6) Enviar respuesta al Query Control
-                t_paquete* r = crear_paquete();
-                r->codigo_operacion = QUERY_FINALIZADA;
-                agregar_a_paquete(r, &qid, sizeof(int));
-                char* motivo = "EXITO";
-                agregar_a_paquete(r, motivo, strlen(motivo) + 1);
-                enviar_paquete(r, fd_qc);
-                eliminar_paquete(r);
-                
-                log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
+            t_paquete* r = crear_paquete();
+            r->codigo_operacion = QUERY_FINALIZADA;
+            agregar_a_paquete(r, &qid, sizeof(int));
+            char* motivo = "EXITO";
+            agregar_a_paquete(r, motivo, strlen(motivo) + 1);
+            enviar_paquete(r, fd_qc);
+            eliminar_paquete(r);
+            
+            log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
 
             break; //SI TERMINO LA QUERY, DEJO DE ATENDER AL WORKER, CUANDO REPLANIFICO CREO EL HILO OTRA VEZ
         }
@@ -481,7 +484,7 @@ void* atenderWorker(void* arg){
             
             break; 
         }
-        case -1: { // TODO: Pasar proceso a EXIT
+        case -1: { 
             log_error(loggerMaster, "Worker %s: conexión perdida", id);
             conexionWorker->conectado = false;
             sem_post(&conexionWorker->semaforo); // -> Podría desconectarse durante un desalojo -> Deadlock
