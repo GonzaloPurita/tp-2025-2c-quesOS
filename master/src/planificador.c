@@ -24,6 +24,11 @@ void planificarConDesalojoYAging() {
     sem_wait(&rePlanificar);
     log_debug(loggerMaster, "Planificador con desalojo activado");
 
+    if(workers_conectados() == 0) {
+        log_debug(loggerMaster, "No hay workers conectados, se omite planificación");
+        continue;
+    }
+
     pthread_mutex_lock(&mutex_cola_ready);
     t_query* query = list_is_empty(cola_ready) ? NULL : list_get(cola_ready, 0);
     pthread_mutex_unlock(&mutex_cola_ready);

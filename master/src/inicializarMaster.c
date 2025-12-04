@@ -111,7 +111,13 @@ void* atenderCliente(void* arg) {
             log_info(loggerMaster, "## Se conecta el Worker <%s> - Cantidad total de Workers: <%d>", worker_id, workers_conectados());
         
             worker_marcar_libre_por_fd(fd);
-            sem_post(&sem_workers_disponibles);
+            
+            // Notificar al planificador según el algoritmo
+            if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0) {
+                sem_post(&sem_workers_disponibles);
+            } else {
+                sem_post(&rePlanificar);
+            }
         
             free(worker_id);
         

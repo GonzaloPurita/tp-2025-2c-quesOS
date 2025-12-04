@@ -6,7 +6,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/bin/${workspaceFolderBasename}",
-      "args": ["master.config"],
+      "args": ["./configs/master-plani-aging.config"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
