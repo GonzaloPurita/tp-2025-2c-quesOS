@@ -84,7 +84,7 @@ void* aging(void* arg){
     usleep(ms * 1000);
     if(q == NULL) return NULL;
     if(id == q->idTemporizador) {
-        if(q->prioridad_actual > 0) {
+        if(q->prioridad_actual > 0 && q->estado == Q_READY) {
             int anterior = q->prioridad_actual;
             q->prioridad_actual = anterior - 1; 
 
