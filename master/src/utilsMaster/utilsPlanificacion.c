@@ -21,7 +21,6 @@ void ordenar_ready(void) {
 
 void aplicar_aging_ready(void) {
     int hubo_cambios = 0;
-
     pthread_mutex_lock(&mutex_cola_ready);
 
     int n = list_size(cola_ready);
@@ -60,6 +59,7 @@ void* hilo_aging(void* arg) {
 }
 
 void iniciarAging(t_query* q){
+    if(!hayAging) return;
     t_info_aging* info = malloc(sizeof(t_info_aging));
 
     pthread_mutex_lock(&mutex_idTemporizador);

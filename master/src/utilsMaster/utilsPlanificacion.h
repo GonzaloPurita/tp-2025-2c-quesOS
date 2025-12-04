@@ -3,6 +3,7 @@
 
 #include <t_query.h>
 #include <utilsMaster/semaforos.h>
+#include <utilsMaster/configMaster.h>
 
 typedef struct {
     int idTemporizador;

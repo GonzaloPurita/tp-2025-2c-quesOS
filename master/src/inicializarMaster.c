@@ -159,6 +159,11 @@ void* atenderCliente(void* arg) {
             if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0){
                 pthread_mutex_lock(&mutex_cola_ready);
                 list_add(cola_ready, q);
+                log_debug(loggerMaster, "La cola de READY al agregar a READY esta de la siguiente forma:");
+                for (int i = 0; i < list_size(cola_ready); i++) {
+                    t_query* query_iter = list_get(cola_ready, i);
+                    log_debug(loggerMaster, "  - Query ID: %d, Prioridad actual: %d", query_iter->QCB->QID, query_iter->prioridad_actual);
+                } 
                 pthread_mutex_unlock(&mutex_cola_ready);
                 sem_post(&hay_query_ready);
             }

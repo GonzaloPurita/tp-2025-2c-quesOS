@@ -92,7 +92,12 @@ void planificarSinDesalojo() {
     sem_wait(&sem_workers_disponibles); 
 
     // Saco la primer query de la cola de READY
-    pthread_mutex_lock(&mutex_cola_ready); 
+    pthread_mutex_lock(&mutex_cola_ready);
+    log_debug(loggerMaster, "La cola de READY al planificar esta de la siguiente forma:");
+    for (int i = 0; i < list_size(cola_ready); i++) {
+        t_query* query_iter = list_get(cola_ready, i);
+        log_debug(loggerMaster, "  - Query ID: %d, Prioridad actual: %d", query_iter->QCB->QID, query_iter->prioridad_actual);
+    } 
     t_query* query = list_remove(cola_ready, 0);
     pthread_mutex_unlock(&mutex_cola_ready); 
     query->idTemporizador = -1; 
