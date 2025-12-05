@@ -94,7 +94,6 @@ void* aging(void* arg){
             list_remove_element(cola_ready, q);
             agregarAReadyPorPrioridad(q);
             pthread_mutex_unlock(&mutex_cola_ready);
-            sem_post(&rePlanificar);
             if(q->prioridad_actual > 0){
                 iniciarAging(q);
             }
