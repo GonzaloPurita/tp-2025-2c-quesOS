@@ -92,7 +92,7 @@ void recibir_queries() {
             interrupt_flag = true;
             pthread_mutex_unlock(&mutex_interrupt);
             log_info(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
-            log_error(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
+            //log_error(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
         }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);

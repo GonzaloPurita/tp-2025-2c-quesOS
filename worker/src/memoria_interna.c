@@ -275,11 +275,11 @@ int elegir_victima_CLOCKM() {
     // No reseteamos el puntero_clock, sigue desde donde quedó la última vez
     int inicio = puntero_clock; 
     
-    // PASO 1: Buscar (0,0). NO modificar bit de uso.
+    // PASO 1: Buscar (0,0).
     while (1) {
         frame* f = &frames[puntero_clock];
         if (!f->uso && !f->modificado) {
-            log_debug(loggerWorker, "Victima CLOCK-M (Paso 1 - 0,0): marco %d", puntero_clock);
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 1 - U=0, M=0): marco %d", puntero_clock);
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
             return victima;
@@ -290,12 +290,12 @@ int elegir_victima_CLOCKM() {
         if (puntero_clock == inicio) break; // Termino vuelta 1
     }
 
-    // PASO 2: Buscar (0,1). SI modificar bit de uso (U=0).
+    // PASO 2: Buscar (0,1). Modifico bit de uso (U=0).
     while (1) {
         frame* f = &frames[puntero_clock];
         
         if (!f->uso && f->modificado) {
-            log_debug(loggerWorker, "Victima CLOCK-M (Paso 2 - 0,1): marco %d", puntero_clock);
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 2 - U=0, M=1): marco %d", puntero_clock);
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
             return victima;
@@ -310,12 +310,11 @@ int elegir_victima_CLOCKM() {
         if (puntero_clock == inicio) break; // Termino vuelta 2
     }
 
-    // PASO 3: Repetir Paso 1 (Buscar 0,0). NO modificar bit de uso.
-    // (Ahora encontraremos los que bajamos en el Paso 2)
+    // PASO 3: Repetir Paso 1 (Buscar 0,0).
     while (1) {
         frame* f = &frames[puntero_clock];
         if (!f->uso && !f->modificado) {
-            log_debug(loggerWorker, "Victima CLOCK-M (Paso 3 - 0,0): marco %d", puntero_clock);
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 3 - U=0, M=0): marco %d", puntero_clock);
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
             return victima;
@@ -326,12 +325,10 @@ int elegir_victima_CLOCKM() {
     }
 
     // PASO 4: Repetir Paso 2 (Buscar 0,1).
-    // Nota: Técnicamente no hace falta modificar U aqui porque ya es la última chance, 
-    // pero el algoritmo original lo hace.
     while (1) {
         frame* f = &frames[puntero_clock];
         if (!f->uso && f->modificado) {
-            log_debug(loggerWorker, "Victima CLOCK-M (Paso 4 - 0,1): marco %d", puntero_clock);
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 4 - U=0, M=1): marco %d", puntero_clock);
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
             return victima;
@@ -342,8 +339,7 @@ int elegir_victima_CLOCKM() {
         if (puntero_clock == inicio) break; 
     }
 
-    // Fallback (no deberia llegar nunca aqui si hay marcos)
-    log_error(loggerWorker, "ERROR CRITICO: Clock-M no encontro victima!");
+    log_error(loggerWorker, "Clock-M no encontro victima!");
     return 0; 
 }
 
