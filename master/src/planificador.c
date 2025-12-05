@@ -207,10 +207,6 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
     datos->worker->fd);
 
     desalojar((void*) datos);
-    // 4) Lanzar hilo que hace el desalojo
-    // pthread_t hiloDesalojo;
-    // pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
-    // pthread_detach(hiloDesalojo);
 }
 
 void* desalojar(void* arg) {

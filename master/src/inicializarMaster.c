@@ -287,14 +287,13 @@ void query_control_desconectado(int qid) {
         if (worker) {
             log_info(loggerMaster, "## Se desaloja la Query <%d> (<%d>) del Worker <%s> - Motivo: DESCONEXION",
                      qid, query->prioridad_actual, worker->id);
-            
+
             // Enviar DESALOJO al Worker
             t_paquete* p = crear_paquete();
             p->codigo_operacion = DESALOJO;
             agregar_a_paquete(p, &qid, sizeof(int));
             enviar_paquete(p, worker->fd);
             eliminar_paquete(p);
-            sem_wait(&worker->semaforo);
         }
     }
     

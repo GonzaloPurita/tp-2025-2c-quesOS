@@ -6,6 +6,21 @@ t_list* cola_ready = NULL;
 t_list* cola_exec  = NULL;
 t_list* cola_exit  = NULL;
 
+void imprimir_cola(t_list* cola, const char* nombre_cola) {
+    int tamanio = list_size(cola);
+    if (tamanio == 0) {
+        log_debug(loggerMaster, "Cola %s: vacía", nombre_cola);
+        return;
+    }
+    
+    log_debug(loggerMaster, "Cola %s (%d elementos):", nombre_cola, tamanio);
+    for (int i = 0; i < tamanio; i++) {
+        t_query* q = list_get(cola, i);
+        log_debug(loggerMaster, "  [%d] QID=%d, Prioridad=%d, PrioridadActual=%d, PC=%d", 
+                  i, q->QCB->QID, q->prioridad, q->prioridad_actual, q->QCB->PC);
+    }
+}
+
 void inicializarListasQueries() {
     cola_ready = list_create();
     cola_exec  = list_create();

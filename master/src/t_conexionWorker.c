@@ -247,48 +247,60 @@ void* atenderWorker(void* arg){
         
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
-            t_list* p = recibir_paquete(fd);
-            if (!p || list_size(p) < 2) {
-                log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
-                if (p) list_destroy_and_destroy_elements(p, free);
-                break;
-            }
-            int qid = *(int*) list_get(p, 0);
-            int pc  = *(int*) list_get(p, 1);
-            list_destroy_and_destroy_elements(p, free);
-
-            // 1) Actualizar PC en la query víctima (ya la movimos a READY en realizarDesalojo)
-            int actualizado = 0;
-            pthread_mutex_lock(&mutex_cola_exec);
-            for (int i = 0; i < list_size(cola_exec); i++) {
-                t_query* q = list_get(cola_exec, i);
-                if (q->QCB->QID == qid) {
-                    q->QCB->PC = pc;
-                    actualizado = 1;
+                t_list* p = recibir_paquete(fd);
+                if (!p || list_size(p) < 2) {
+                    log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
+                    if (p) list_destroy_and_destroy_elements(p, free);
                     break;
                 }
-            }
-            pthread_mutex_unlock(&mutex_cola_exec);
+                int qid = *(int*) list_get(p, 0);
+                int pc  = *(int*) list_get(p, 1);
+                list_destroy_and_destroy_elements(p, free);
 
-            if (!actualizado) {
-                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY (posible desconexión de QC)", qid);
-                // Marcar worker como libre (no esperar RTA_DESALOJO en este caso)
-                worker_marcar_libre_por_fd(conexionWorker->fd);
-                sem_post(&conexionWorker->semaforo);
-
-                if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
-                    sem_post(&sem_workers_disponibles);
-                } else{
-                    sem_post(&rePlanificar);
+                // 1) Actualizar PC en la query víctima (ya la movimos a READY en realizarDesalojo)
+                int actualizado = 0;
+                pthread_mutex_lock(&mutex_cola_exec);
+                for (int i = 0; i < list_size(cola_exec); i++) {
+                    t_query* q = list_get(cola_exec, i);
+                    if (q->QCB->QID == qid) {
+                        q->QCB->PC = pc;
+                        actualizado = 1;
+                        break;
+                    }
                 }
-                break;  
-            } else {
-                log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
-            }
+                pthread_mutex_unlock(&mutex_cola_exec);
 
-            // 2) Despertar al hilo desalojar() para que envíe la nueva query
-            sem_post(&conexionWorker->semaforo);
-            break;
+                if (!actualizado) {
+                    bool encontre = false;
+                    pthread_mutex_lock(&mutex_cola_exit);
+                    for (int i = 0; i < list_size(cola_exit); i++) {
+                        t_query* queryDesconectada = list_get(cola_exit, i);
+                        if (queryDesconectada->QCB->QID == qid) {
+                            queryDesconectada->QCB->PC = pc;
+                            encontre = true;
+                            break;
+                        }
+                    }
+                    pthread_mutex_unlock(&mutex_cola_exit);
+
+                    if(encontre) { // Estaba en EXIT --> Se desconecto la Query
+                        worker_marcar_libre_por_fd(fd);
+    
+                        if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
+                            sem_post(&sem_workers_disponibles);
+                        } else{
+                            sem_post(&rePlanificar);
+                        }
+                    }
+                    
+                    break;  
+                } else { // Estaba en EXEC --> Lo desaloje normalmente
+                    log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
+                    // 2) Despertar al hilo desalojar() para que envíe la nueva query
+                    sem_post(&conexionWorker->semaforo);
+                }
+
+                break;
         }
         case OP_END: {
             // 1) Recibir el paquete del Worker
