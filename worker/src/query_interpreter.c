@@ -340,9 +340,7 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     log_debug(loggerWorker, "EL paquete de %d contiene: %s %s", query_actual->query_id, formato->file_name, formato->tag);
     eliminar_paquete(paquete);
 
-    log_debug(loggerWorker, "Estoy afuera");
     op_code rta = recibir_operacion(conexionStorage);
-    log_debug(loggerWorker, "Estoy adentro");
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "CREATE");
 
