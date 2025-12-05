@@ -809,7 +809,7 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
             log_debug(loggerWorker, "%s -> SUCCESS", operacion);
             return;
         case ERROR_FILE_NOT_FOUND:
-            motivo_error = "File no encontrado";
+            motivo_error = "File:Tag no encontrado";
             break;
         case ERROR_TAG_NOT_FOUND:
             motivo_error = "Tag no encontrado";
