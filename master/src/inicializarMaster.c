@@ -294,15 +294,7 @@ void query_control_desconectado(int qid) {
             agregar_a_paquete(p, &qid, sizeof(int));
             enviar_paquete(p, worker->fd);
             eliminar_paquete(p);
-            
-            // Marcar worker como libre (no esperar RTA_DESALOJO en este caso)
-            worker_marcar_libre_por_fd(worker->fd);
-
-            if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
-                sem_post(&sem_workers_disponibles);
-            } else{
-                sem_post(&rePlanificar);
-            }
+            sem_wait(&worker->semaforo);
         }
     }
     

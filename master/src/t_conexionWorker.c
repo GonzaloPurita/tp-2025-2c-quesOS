@@ -272,7 +272,15 @@ void* atenderWorker(void* arg){
 
             if (!actualizado) {
                 log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY (posible desconexión de QC)", qid);
-                
+                // Marcar worker como libre (no esperar RTA_DESALOJO en este caso)
+                worker_marcar_libre_por_fd(conexionWorker->fd);
+                sem_post(&conexionWorker->semaforo);
+
+                if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
+                    sem_post(&sem_workers_disponibles);
+                } else{
+                    sem_post(&rePlanificar);
+                }
                 break;  
             } else {
                 log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);

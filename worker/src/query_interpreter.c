@@ -26,6 +26,17 @@ void recibir_queries() {
                 continue;
             }
 
+            pthread_mutex_lock(&mutex_flag);
+            bool ocupado = hilo_cpu_corriendo;
+            pthread_mutex_unlock(&mutex_flag);
+
+            if (ocupado) {
+                sem_wait(&sem_fin_query); // Espera a que el hilo anterior termine
+                pthread_mutex_lock(&mutex_flag);
+                hilo_cpu_corriendo = false;
+                pthread_mutex_unlock(&mutex_flag);
+            }
+
             int* query_id = list_get(paquete, 0);
             int* pc_inicial = list_get(paquete, 1);
             char* nombre_query = list_get(paquete, 2);
@@ -55,9 +66,20 @@ void recibir_queries() {
             interrupt_flag = false;
             pthread_mutex_unlock(&mutex_interrupt);
 
+            // Marco que hay un hilo corriendo
+            pthread_mutex_lock(&mutex_flag);
+            hilo_cpu_corriendo = true;
+            pthread_mutex_unlock(&mutex_flag);
+
             pthread_t hilo_cpu;
             if (pthread_create(&hilo_cpu, NULL, (void*)correr_query_en_hilo, (void*)args) != 0) {
                 log_error(loggerWorker, "Error al crear el hilo de ejecución");
+                
+                // Si falla, cambio la flag
+                pthread_mutex_lock(&mutex_flag);
+                hilo_cpu_corriendo = false;
+                pthread_mutex_unlock(&mutex_flag);
+
                 free(args->path_script);
                 free(args);
             } else {
@@ -80,9 +102,6 @@ void recibir_queries() {
 }
 
 void* correr_query_en_hilo(void* arg) {
-    // char *path_query = string_new();
-    // string_append(&path_query, configWorker->path_scripts);
-    // string_append(&path_query, query_actual->nombre_query);
     t_hilo_args* args = (t_hilo_args*) arg;
     char* path_query = args->path_script;
     int q_id = args->query_id;
@@ -110,10 +129,6 @@ void* correr_query_en_hilo(void* arg) {
             break;
     }
 
-    // free(query_actual->nombre_query);
-    // free(query_actual);
-    // query_actual = NULL;
-
     free(path_query); 
     free(args);
 
@@ -121,6 +136,9 @@ void* correr_query_en_hilo(void* arg) {
     interrupt_flag = false;
     pthread_mutex_unlock(&mutex_interrupt);
     
+    // Aviso al hilo principal que terminé
+    sem_post(&sem_fin_query);
+
     return NULL;
 }
 

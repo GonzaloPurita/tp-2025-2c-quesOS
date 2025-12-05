@@ -6,6 +6,7 @@
 #include <commons/log.h>
 #include "estructuras_memoria.h"
 #include <semaphore.h>
+#include <pthread.h> 
 
 typedef struct t_config_worker t_config_worker;
 // typedef struct frame frame;
@@ -26,6 +27,11 @@ extern t_config_worker* configWorker;
 extern bool interrupt_flag;
 extern bool query_error_flag;
 
+/* sincronizacion hilos (NUEVO) */
+extern sem_t sem_fin_query;
+extern bool hilo_cpu_corriendo;
+extern pthread_mutex_t mutex_flag;
+
 /* otros externos ... */
 extern t_query_context* query_actual;
 
@@ -43,7 +49,7 @@ extern t_dictionary* diccionario_tablas;
 extern int PC_ACTUAL;
 extern int TAM_BLOQUE;
 
-// /* semaforos */
+/* semaforos memoria */
 extern pthread_mutex_t mutex_memoria;
 
 extern int puntero_clock;

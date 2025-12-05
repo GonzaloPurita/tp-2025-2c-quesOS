@@ -13,6 +13,10 @@ t_config_worker* configWorker;
 bool interrupt_flag = false;
 bool query_error_flag = false;
 
+sem_t sem_fin_query;
+bool hilo_cpu_corriendo = false;
+pthread_mutex_t mutex_flag;
+
 // Datos globales
 int TAM_PAGINA;
 int TAM_MEMORIA;
@@ -35,7 +39,7 @@ void iniciar_memoria(){
     TAM_PAGINA = TAM_BLOQUE;                // viene de Storage
     TAM_MEMORIA = configWorker->tam_memoria;    // viene del archivo de config
     CANTIDAD_MARCOS = TAM_MEMORIA / TAM_PAGINA;
-    MEMORIA = calloc(1, TAM_MEMORIA); // memoria inicializada en 0, y solo se reserva un bloque de memoria
+    MEMORIA = calloc(1, TAM_MEMORIA); // memoria inicializada en 0 y solo se reserva un bloque de memoria
 
     if (!MEMORIA) {
         log_error(loggerWorker, "Error al reservar memoria interna");
@@ -45,8 +49,11 @@ void iniciar_memoria(){
     frames = calloc(CANTIDAD_MARCOS, sizeof(frame));
 
     pthread_mutex_init(&mutex_memoria, NULL);
+    
+    sem_init(&sem_fin_query, 0, 0);
+    pthread_mutex_init(&mutex_flag, NULL);
 
-   diccionario_tablas = dictionary_create();
+    diccionario_tablas = dictionary_create();
 
     log_debug(loggerWorker, "Memoria interna inicializada. TAM_MEMORIA=%d, TAM_PAGINA=%d, MARCOS=%d", TAM_MEMORIA, TAM_PAGINA, CANTIDAD_MARCOS);
 }
