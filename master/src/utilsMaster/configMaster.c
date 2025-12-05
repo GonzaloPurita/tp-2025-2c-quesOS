@@ -2,10 +2,11 @@
 
 t_config_master* configMaster;
 t_log* loggerMaster;
+bool hayAging = false;
 
-void iniciar_config() {
+void iniciar_config(char* ruta_config) {
     configMaster = malloc(sizeof(t_config_master));
-    t_config* config = config_create("master.config");
+    t_config* config = config_create(ruta_config);
 
     configMaster->algoritmo_planificacion = strdup(config_get_string_value(config, "ALGORITMO_PLANIFICACION"));
     configMaster->log_level = strdup(config_get_string_value(config, "LOG_LEVEL"));
@@ -13,6 +14,11 @@ void iniciar_config() {
     // Valores numéricos
     configMaster->puerto_escucha = config_get_int_value(config, "PUERTO_ESCUCHA");
     configMaster->tiempo_aging = config_get_int_value(config, "TIEMPO_AGING");
+    if (configMaster->tiempo_aging > 0 && strcmp(configMaster->algoritmo_planificacion, "PRIORIDADES") == 0) {
+        hayAging = true;
+    } else {
+        hayAging = false;
+    }
 
     config_destroy(config);
     loggerMaster = log_create("master.log", "Master", 1, log_level_from_string(configMaster->log_level));

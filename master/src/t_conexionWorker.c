@@ -23,6 +23,7 @@ int worker_registrar(char* id, int fd) {
     if (!id) return 0;
 
     t_conexionWorker* w = malloc(sizeof(*w));
+    
     if (!w) {
         log_error(loggerMaster, "worker_registrar: malloc fallo");
         return 0;
@@ -55,8 +56,11 @@ int worker_registrar(char* id, int fd) {
     }
 
     pthread_mutex_lock(&mutex_workers);
+    
     if (!LISTA_WORKERS) {
+
         LISTA_WORKERS = list_create();
+        
         if (!LISTA_WORKERS) {
             log_error(loggerMaster, "worker_registrar: list_create fallo");
             pthread_mutex_unlock(&mutex_workers);
@@ -66,8 +70,11 @@ int worker_registrar(char* id, int fd) {
             return 0;
         }
     }
+
     list_add(LISTA_WORKERS, w);
+
     int list_size_now = list_size(LISTA_WORKERS);
+
     pthread_mutex_unlock(&mutex_workers);
 
     pthread_t hiloWORKER;
@@ -111,6 +118,7 @@ int workers_disponibles(void) {
 t_conexionWorker* encontrarWorkerPorQid(int qid) {
     pthread_mutex_lock(&mutex_workers);
     t_conexionWorker* w = NULL;
+    
     for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
         t_conexionWorker* it = list_get(LISTA_WORKERS, i);
         if (it->conectado && it->qid_actual == qid) { w = it; break; }
@@ -176,11 +184,13 @@ void worker_desconectar_por_fd(int fd) {
                 qid_en_ejecucion,
                 total_workers
             );
+            q->idTemporizador = -1;
 
             // notificar al Query Control
             t_paquete* paquete = crear_paquete();
             paquete->codigo_operacion = QUERY_FINALIZADA;
             agregar_a_paquete(paquete, &qid_en_ejecucion, sizeof(int));
+            agregar_a_paquete(paquete, "Worker desconectado", strlen("Worker desconectado") + 1);
             enviar_paquete(paquete, q->fd_qc);
             eliminar_paquete(paquete);
 
@@ -227,7 +237,7 @@ void* atenderWorker(void* arg){
 
     if (libre) {
         sem_wait(&conexionWorker->esperarQuery);
-}
+    }
       
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
       if(codigoOperacion <= 0){
@@ -237,40 +247,60 @@ void* atenderWorker(void* arg){
         
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
-            t_list* p = recibir_paquete(fd);
-            if (!p || list_size(p) < 2) {
-                log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
-                if (p) list_destroy_and_destroy_elements(p, free);
-                break;
-            }
-            int qid = *(int*) list_get(p, 0);
-            int pc  = *(int*) list_get(p, 1);
-            list_destroy_and_destroy_elements(p, free);
-
-            // 1) Actualizar PC en la query víctima (ya la movimos a READY en realizarDesalojo)
-            int actualizado = 0;
-            pthread_mutex_lock(&mutex_cola_exec);
-            for (int i = 0; i < list_size(cola_exec); i++) {
-                t_query* q = list_get(cola_exec, i);
-                if (q->QCB->QID == qid) {
-                    q->QCB->PC = pc;
-                    actualizado = 1;
+                t_list* p = recibir_paquete(fd);
+                if (!p || list_size(p) < 2) {
+                    log_error(loggerMaster, "Worker %s: RTA_DESALOJO mal formado", conexionWorker->id);
+                    if (p) list_destroy_and_destroy_elements(p, free);
                     break;
                 }
-            }
-            pthread_mutex_unlock(&mutex_cola_exec);
+                int qid = *(int*) list_get(p, 0);
+                int pc  = *(int*) list_get(p, 1);
+                list_destroy_and_destroy_elements(p, free);
 
-            if (!actualizado) {
-                log_warning(loggerMaster, "RTA_DESALOJO QID=%d no encontrada en READY (posible desconexión de QC)", qid);
-                
-                break;  
-            } else {
-                log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
-            }
+                // 1) Actualizar PC en la query víctima (ya la movimos a READY en realizarDesalojo)
+                int actualizado = 0;
+                pthread_mutex_lock(&mutex_cola_exec);
+                for (int i = 0; i < list_size(cola_exec); i++) {
+                    t_query* q = list_get(cola_exec, i);
+                    if (q->QCB->QID == qid) {
+                        q->QCB->PC = pc;
+                        actualizado = 1;
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&mutex_cola_exec);
 
-            // 2) Despertar al hilo desalojar() para que envíe la nueva query
-            sem_post(&conexionWorker->semaforo);
-            break;
+                if (!actualizado) {
+                    bool encontre = false;
+                    pthread_mutex_lock(&mutex_cola_exit);
+                    for (int i = 0; i < list_size(cola_exit); i++) {
+                        t_query* queryDesconectada = list_get(cola_exit, i);
+                        if (queryDesconectada->QCB->QID == qid) {
+                            queryDesconectada->QCB->PC = pc;
+                            encontre = true;
+                            break;
+                        }
+                    }
+                    pthread_mutex_unlock(&mutex_cola_exit);
+
+                    if(encontre) { // Estaba en EXIT --> Se desconecto la Query
+                        worker_marcar_libre_por_fd(fd);
+    
+                        if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
+                            sem_post(&sem_workers_disponibles);
+                        } else{
+                            sem_post(&rePlanificar);
+                        }
+                    }
+                    
+                    break;  
+                } else { // Estaba en EXEC --> Lo desaloje normalmente
+                    log_info(loggerMaster, "## (%d) - PC actualizado por desalojo a %d", qid, pc);
+                    // 2) Despertar al hilo desalojar() para que envíe la nueva query
+                    sem_post(&conexionWorker->semaforo);
+                }
+
+                break;
         }
         case OP_END: {
             // 1) Recibir el paquete del Worker
@@ -302,8 +332,11 @@ void* atenderWorker(void* arg){
                 break;
             }
 
+            q->idTemporizador = -1;
+
             // 3) Guardar fd_qc antes de pasar la query a exit
             int fd_qc = q->fd_qc;
+            
 
             // 4) Movemos la query a exit
             actualizarMetricas(Q_EXEC, Q_EXIT, q);
@@ -317,15 +350,15 @@ void* atenderWorker(void* arg){
             sem_post(&rePlanificar);
 
             // 6) Enviar respuesta al Query Control
-                t_paquete* r = crear_paquete();
-                r->codigo_operacion = QUERY_FINALIZADA;
-                agregar_a_paquete(r, &qid, sizeof(int));
-                char* motivo = "EXITO";
-                agregar_a_paquete(r, motivo, strlen(motivo) + 1);
-                enviar_paquete(r, fd_qc);
-                eliminar_paquete(r);
-                
-                log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
+            t_paquete* r = crear_paquete();
+            r->codigo_operacion = QUERY_FINALIZADA;
+            agregar_a_paquete(r, &qid, sizeof(int));
+            char* motivo = "EXITO";
+            agregar_a_paquete(r, motivo, strlen(motivo) + 1);
+            enviar_paquete(r, fd_qc);
+            eliminar_paquete(r);
+            
+            log_info(loggerMaster, "## Se terminó la Query %d en el Worker %s", qid, id);
 
             break; //SI TERMINO LA QUERY, DEJO DE ATENDER AL WORKER, CUANDO REPLANIFICO CREO EL HILO OTRA VEZ
         }
@@ -432,6 +465,7 @@ void* atenderWorker(void* arg){
                 break;
             }
             
+            q->idTemporizador = -1;
             int fd_qc = q->fd_qc;
             
             // muevo la query a EXIT
@@ -470,9 +504,10 @@ void* atenderWorker(void* arg){
             
             break; 
         }
-        case -1: {
+        case -1: { 
             log_error(loggerMaster, "Worker %s: conexión perdida", id);
             conexionWorker->conectado = false;
+            sem_post(&conexionWorker->semaforo); // -> Podría desconectarse durante un desalojo -> Deadlock
             pthread_exit(NULL);
             break;
         }

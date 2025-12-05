@@ -26,6 +26,17 @@ void recibir_queries() {
                 continue;
             }
 
+            pthread_mutex_lock(&mutex_flag);
+            bool ocupado = hilo_cpu_corriendo;
+            pthread_mutex_unlock(&mutex_flag);
+
+            if (ocupado) {
+                sem_wait(&sem_fin_query); // Espera a que el hilo anterior termine
+                pthread_mutex_lock(&mutex_flag);
+                hilo_cpu_corriendo = false;
+                pthread_mutex_unlock(&mutex_flag);
+            }
+
             int* query_id = list_get(paquete, 0);
             int* pc_inicial = list_get(paquete, 1);
             char* nombre_query = list_get(paquete, 2);
@@ -55,9 +66,20 @@ void recibir_queries() {
             interrupt_flag = false;
             pthread_mutex_unlock(&mutex_interrupt);
 
+            // Marco que hay un hilo corriendo
+            pthread_mutex_lock(&mutex_flag);
+            hilo_cpu_corriendo = true;
+            pthread_mutex_unlock(&mutex_flag);
+
             pthread_t hilo_cpu;
             if (pthread_create(&hilo_cpu, NULL, (void*)correr_query_en_hilo, (void*)args) != 0) {
                 log_error(loggerWorker, "Error al crear el hilo de ejecución");
+                
+                // Si falla, cambio la flag
+                pthread_mutex_lock(&mutex_flag);
+                hilo_cpu_corriendo = false;
+                pthread_mutex_unlock(&mutex_flag);
+
                 free(args->path_script);
                 free(args);
             } else {
@@ -70,6 +92,7 @@ void recibir_queries() {
             interrupt_flag = true;
             pthread_mutex_unlock(&mutex_interrupt);
             log_info(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
+            //log_error(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
         }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
@@ -79,9 +102,6 @@ void recibir_queries() {
 }
 
 void* correr_query_en_hilo(void* arg) {
-    // char *path_query = string_new();
-    // string_append(&path_query, configWorker->path_scripts);
-    // string_append(&path_query, query_actual->nombre_query);
     t_hilo_args* args = (t_hilo_args*) arg;
     char* path_query = args->path_script;
     int q_id = args->query_id;
@@ -109,10 +129,6 @@ void* correr_query_en_hilo(void* arg) {
             break;
     }
 
-    // free(query_actual->nombre_query);
-    // free(query_actual);
-    // query_actual = NULL;
-
     free(path_query); 
     free(args);
 
@@ -120,6 +136,9 @@ void* correr_query_en_hilo(void* arg) {
     interrupt_flag = false;
     pthread_mutex_unlock(&mutex_interrupt);
     
+    // Aviso al hilo principal que terminé
+    sem_post(&sem_fin_query);
+
     return NULL;
 }
 
@@ -157,7 +176,7 @@ t_estado_query ejecutar_query(char* path_query) {
                 log_error(loggerWorker, "## Query %d: Abortando ejecución por error previo", query_actual->query_id);
                 notificar_error_a_master("Error durante la ejecución de la query");
                 estado_salida = QUERY_ERROR;
-                break;
+                return estado_salida;
             }
 
             log_info(loggerWorker, "## Query %d: FETCH - Program Counter : %d - %s", query_actual->query_id, PC_ACTUAL, linea);
@@ -165,7 +184,18 @@ t_estado_query ejecutar_query(char* path_query) {
             t_instruccion* inst = decode(linea);
             execute(inst);
             destruir_instruccion(inst);
-            
+
+            pthread_mutex_lock(&mutex_error);
+            error_flag = query_error_flag;
+            pthread_mutex_unlock(&mutex_error);
+            if(error_flag) {
+                estado_salida = QUERY_ERROR;
+                pthread_mutex_lock(&mutex_error);
+                query_error_flag = false;
+                pthread_mutex_unlock(&mutex_error);
+                return estado_salida;
+            }
+
             PC_ACTUAL++;
 
             pthread_mutex_lock(&mutex_interrupt);
@@ -174,7 +204,7 @@ t_estado_query ejecutar_query(char* path_query) {
             if (interrupt) {
                 log_warning(loggerWorker, "## Query %d: Interrupción detectada en PC: %d", query_actual->query_id, PC_ACTUAL);
                 estado_salida = QUERY_DESALOJADA;
-                break;
+                return estado_salida;
             }
         }
         linea_actual++;
@@ -307,13 +337,23 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
     enviar_paquete(paquete, conexionStorage);
+    log_debug(loggerWorker, "EL paquete de %d contiene: %s %s", query_actual->query_id, formato->file_name, formato->tag);
     eliminar_paquete(paquete);
 
+    log_debug(loggerWorker, "Estoy afuera");
     op_code rta = recibir_operacion(conexionStorage);
+    log_debug(loggerWorker, "Estoy adentro");
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "CREATE");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: CREATE %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+    }
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
 }
@@ -336,13 +376,20 @@ void ejecutar_truncate(t_instruccion* inst){ // TRUNCATE <NOMBRE_FILE>:<TAG> <TA
     enviar_paquete(paquete, conexionStorage);
     eliminar_paquete(paquete);
 
-    op_code rta1 = recibir_operacion(conexionStorage);
+    op_code rta = recibir_operacion(conexionStorage);
     t_list* rtaP = recibir_paquete(conexionStorage);
-    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE 1: %d", rta1);
+    log_debug(loggerWorker, "Respuesta recibida de Storage para TRUNCATE 1: %d", rta);
 
-    manejar_respuesta_storage(rta1, "TRUNCATE");
+    manejar_respuesta_storage(rta, "TRUNCATE");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: TRUNCATE %s", query_actual->query_id, recurso);
+    }
 
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
@@ -370,11 +417,18 @@ void ejecutar_tag(t_instruccion* inst){ //  TAG <FILE_ORIGEN>:<TAG_ORIGEN> <FILE
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "TAG");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
-
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato_origen);
     destruir_formato(formato_destino);
+
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: TAG %s = %s", query_actual->query_id, recurso_origen, recurso_destino);
+    }
 }
 
 void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
@@ -394,8 +448,14 @@ void ejecutar_delete(t_instruccion* inst){ // DELETE <NOMBRE_FILE>:<TAG>
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "DELETE");
 
-
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: DELETE %s", query_actual->query_id, recurso);
+    }
 
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
@@ -412,7 +472,7 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     if (tabla != NULL) {
         flush_paginas_modificadas_de_tabla(tabla, formato);
     } else {
-        log_warning(loggerWorker, "No existe tabla de páginas para %s:%s — no hay nada que commitear", formato->file_name, formato->tag);
+        log_warning(loggerWorker, "No existe tabla de páginas para %s:%s — no hay páginas para flushear", formato->file_name, formato->tag);
     }
 
     free(clave_tabla);
@@ -432,7 +492,14 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     
     manejar_respuesta_storage(rta, "COMMIT");
 
-    log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
+    if(rta != OP_SUCCESS){
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+    }
+    else {
+        log_info(loggerWorker, "## Query %d: - Instrucción realizada: COMMIT %s", query_actual->query_id, recurso);
+    }
 
     list_destroy_and_destroy_elements(rtaP, free);
     destruir_formato(formato);
@@ -458,7 +525,7 @@ void ejecutar_end(t_instruccion* inst){
 
 
  // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>  ej: READ MATERIAS:BASE 0 8
-void ejecutar_read(t_instruccion* inst) { 
+ void ejecutar_read(t_instruccion* inst) { 
     char* recurso = inst->parametros[0];
     int direccion_base = atoi(inst->parametros[1]);
     int tamanio = atoi(inst->parametros[2]);
@@ -477,10 +544,17 @@ void ejecutar_read(t_instruccion* inst) {
             // Ya no logueamos MISS aquí porque lo hace pedir_pagina_a_storage
             
             // Verificamos si la carga fue exitosa
-            if (!pedir_pagina_a_storage(formato, *nro_pagina)) {
+            op_code resultado_pedido = pedir_pagina_a_storage(formato, *nro_pagina);
+            
+            if (resultado_pedido != OP_SUCCESS) {
                 log_error(loggerWorker, "No se pudo cargar la página %d. Abortando READ.", *nro_pagina);
                 error_carga = true;
                 
+                char* motivo = "Error desconocido en carga";
+                if (resultado_pedido == ERROR_OUT_OF_BOUNDS) motivo = "Lectura fuera de los limites";
+                
+                notificar_error_a_master(motivo);
+
                 // Levantamos la bandera para detener el script
                 pthread_mutex_lock(&mutex_error);
                 query_error_flag = true;
@@ -498,9 +572,28 @@ void ejecutar_read(t_instruccion* inst) {
     }
 
     // 2. Leer de Memoria (Solo si todo cargó bien)
-    char* contenido = leer_desde_memoria(formato, direccion_base, tamanio);
+    op_code resultado_lectura;
+    char* contenido = leer_desde_memoria(formato, direccion_base, tamanio, &resultado_lectura);
     log_info(loggerWorker, "Contenido leído de memoria para READ %s dir_base=%d tam=%d: %s", recurso, direccion_base, tamanio, contenido);
 
+    
+    if(resultado_lectura != OP_SUCCESS) {
+        pthread_mutex_lock(&mutex_error);
+        query_error_flag = true;
+        pthread_mutex_unlock(&mutex_error);
+
+        char* motivo;
+
+        if(resultado_lectura == ERROR_OUT_OF_BOUNDS) {
+            motivo = "Lectura fuera de los limites";
+        }
+        else {
+            motivo = "Error desconocido durante la lectura";
+        }
+        notificar_error_a_master(motivo);
+        return;
+    }
+    
     // 3. Enviar respuesta al Master
     t_paquete* respuesta = crear_paquete();
     respuesta->codigo_operacion = OP_READ;
@@ -521,7 +614,7 @@ void ejecutar_read(t_instruccion* inst) {
     destruir_formato(formato);
 }
 
-void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
+void ejecutar_write(t_instruccion* inst) {   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
     char* recurso = inst->parametros[0];       
     
     t_formato* formato = mapear_formato(recurso);
@@ -530,22 +623,40 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
     int tamanio_valor = strlen(valor); //lo que ocupa el string
 
     // calculo las paginas necesarias
-    t_list* paginas = paginas_necesarias(direccion_base, tamanio_valor);
+    int pagina_inicio = direccion_base / TAM_PAGINA;
+    int pagina_fin = (direccion_base + tamanio_valor - 1) / TAM_PAGINA;
+    int cant_paginas = pagina_fin - pagina_inicio + 1;
 
-    log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
+    log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", cant_paginas, formato->file_name, formato->tag, direccion_base, tamanio_valor);
 
-    // para cada página, verificamos si esta en memoria
-    for (int i = 0; i < list_size(paginas); i++) { 
-        int* nro_pagina = list_get(paginas, i);
-        bool en_memoria = esta_en_memoria(formato, *nro_pagina);
+    int bytes_restantes = tamanio_valor;
+    int posicion_valor = 0;
+    int nro_pagina_actual = pagina_inicio;
+    int offset = direccion_base % TAM_PAGINA;
+
+    // para cada página, verifico si esta en memoria Y escribo
+    while (bytes_restantes > 0) {
+        
+        // Calculo cuánto escribir en esta página
+        int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
+
+        bool en_memoria = esta_en_memoria(formato, nro_pagina_actual);
 
         if (!en_memoria) {
-            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
-            pedir_pagina_a_storage(formato, *nro_pagina);
+            log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, nro_pagina_actual);
+            if (!pedir_pagina_a_storage(formato, nro_pagina_actual)) {
+                log_error(loggerWorker, "Fallo al traer pagina %d", nro_pagina_actual);
+                break; 
+            }
         }
-    }
 
-    escribir_en_memoria(formato, direccion_base, valor);
+        escribir_en_memoria(formato, nro_pagina_actual, offset, valor + posicion_valor, bytes_a_usar);
+
+        bytes_restantes -= bytes_a_usar;
+        posicion_valor += bytes_a_usar;
+        offset = 0; // Para las siguientes páginas, el offset siempre arranca en 0
+        nro_pagina_actual++;
+    }
 
     // informo al Master que se hizo el WRITE
     t_paquete* respuesta = crear_paquete();
@@ -556,11 +667,11 @@ void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_O
 
     log_info(loggerWorker, "## Query %d: - Instrucción realizada: WRITE %s:%s base=%d valor=%s", query_actual->query_id, formato->file_name, formato->tag, direccion_base, valor);
 
-    list_destroy_and_destroy_elements(paginas, free);
     destruir_formato(formato);
 }
 
-void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
+// FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
+void ejecutar_flush(t_instruccion* inst){ 
     char* recurso = inst->parametros[0];
     t_formato* formato = mapear_formato(recurso);
 
@@ -574,8 +685,10 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
         destruir_formato(formato);
         return;
     }else {
-        flush_paginas_modificadas_de_tabla(tabla, formato);
-        log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+        bool exito = flush_paginas_modificadas_de_tabla(tabla, formato);
+        if(exito) {
+            log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+        }
     }
     
     free(clave_tabla);
@@ -583,13 +696,16 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
 }
 
 // envia todas las pags modificadas de la tabla 'tabla' para el file:tag 'formato'.
-void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
+bool flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
 
-    if (!tabla || !formato) return;
+    if (!tabla || !formato) return true;
 
     t_list* keys = dictionary_keys(tabla->paginas);
+    bool todo_ok = true;
 
     for (int i = 0; i < list_size(keys); i++) {
+
+        if (!todo_ok) break;
 
         char* key = list_get(keys, i);
         entrada_pag* entrada = dictionary_get(tabla->paginas, key);
@@ -628,11 +744,14 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         t_list* rtaList = recibir_paquete(conexionStorage);
         if (rtaList) list_destroy_and_destroy_elements(rtaList, free);
 
-        if (rta != OP_SUCCESS)
+        if (rta != OP_SUCCESS) {
             manejar_respuesta_storage(rta, "FLUSH");
+            todo_ok = false;
+        }
     }
 
     list_destroy(keys);
+    return todo_ok;
 }
 
 void guardar_paginas_modificadas() {
@@ -663,13 +782,28 @@ void guardar_paginas_modificadas() {
         t_pagina_a_guardar* p = list_get(paginas, i);
 
         t_paquete* paquete = crear_paquete();
+        paquete->codigo_operacion = OP_WRITE; 
+        agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
         agregar_a_paquete(paquete, p->file, strlen(p->file) + 1);
         agregar_a_paquete(paquete, p->tag, strlen(p->tag) + 1);
         agregar_a_paquete(paquete, &p->page_num, sizeof(int));
         agregar_a_paquete(paquete, p->contenido, TAM_PAGINA);
+        int tam_pag = TAM_PAGINA;
+        agregar_a_paquete(paquete, &tam_pag, sizeof(int));
 
         enviar_paquete(paquete, conexionStorage);
         eliminar_paquete(paquete);
+
+        op_code rta = recibir_operacion(conexionStorage);
+        t_list* rtaList = recibir_paquete(conexionStorage);
+        if (rtaList) list_destroy_and_destroy_elements(rtaList, free);
+        
+        if (rta != OP_SUCCESS) {
+            log_error(loggerWorker, "Error al guardar página %d de %s:%s en desalojo. Cod: %d", 
+                      p->page_num, p->file, p->tag, rta);
+        } else {
+            log_debug(loggerWorker, "Página %d guardada correctamente", p->page_num);
+        }
 
         pthread_mutex_lock(&mutex_memoria);
         frames[p->index_frame].modificado = false;
@@ -690,10 +824,10 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
 
     switch (respuesta) {
         case OP_SUCCESS:
-            log_debug(loggerWorker, "[Storage] %s -> SUCCESS", operacion);
+            log_debug(loggerWorker, "%s -> SUCCESS", operacion);
             return;
         case ERROR_FILE_NOT_FOUND:
-            motivo_error = "File no encontrado";
+            motivo_error = "File:Tag no encontrado";
             break;
         case ERROR_TAG_NOT_FOUND:
             motivo_error = "Tag no encontrado";

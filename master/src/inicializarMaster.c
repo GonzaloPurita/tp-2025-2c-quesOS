@@ -92,15 +92,15 @@ void* atenderCliente(void* arg) {
                 return NULL;
             }
         
-            if (configMaster->tiempo_aging > 0 && !aging_started && configMaster->algoritmo_planificacion && strcmp(configMaster->algoritmo_planificacion, "PRIORIDADES") == 0) {
-                aging_started = 1;
-                pthread_t th_aging;
-                if (pthread_create(&th_aging, NULL, hilo_aging, NULL) != 0) {
-                    log_error(loggerMaster, "Error creando hilo de aging");
-                } else {
-                    pthread_detach(th_aging);
-                }
-            }
+            // if (configMaster->tiempo_aging > 0 && !aging_started && configMaster->algoritmo_planificacion && strcmp(configMaster->algoritmo_planificacion, "PRIORIDADES") == 0) {
+            //     aging_started = 1;
+            //     pthread_t th_aging;
+            //     if (pthread_create(&th_aging, NULL, hilo_aging, NULL) != 0) {
+            //         log_error(loggerMaster, "Error creando hilo de aging");
+            //     } else {
+            //         pthread_detach(th_aging);
+            //     }
+            // }
         
             int ok = 1;
             t_paquete* r = crear_paquete();
@@ -111,7 +111,13 @@ void* atenderCliente(void* arg) {
             log_info(loggerMaster, "## Se conecta el Worker <%s> - Cantidad total de Workers: <%d>", worker_id, workers_conectados());
         
             worker_marcar_libre_por_fd(fd);
-            sem_post(&sem_workers_disponibles);
+            
+            // Notificar al planificador según el algoritmo
+            if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0) {
+                sem_post(&sem_workers_disponibles);
+            } else {
+                sem_post(&rePlanificar);
+            }
         
             free(worker_id);
         
@@ -122,6 +128,7 @@ void* atenderCliente(void* arg) {
         case SUBMIT_QUERY: {
             // Recibo la query: [ int prioridad ][ int len ][ char[len] path ]
             t_list* datos = recibir_paquete(fd);
+
             if (!datos || list_size(datos) < 3) {
                 log_error(loggerMaster, "fd=%d: SUBMIT_QUERY mal formado (items=%d)", fd, datos ? list_size(datos) : -1);
                 if (datos) list_destroy_and_destroy_elements(datos, free);
@@ -130,11 +137,12 @@ void* atenderCliente(void* arg) {
             }
             
             int prioridad = *(int*) list_get(datos, 0);
-            int len       = *(int*) list_get(datos, 1);
+            int len = *(int*) list_get(datos, 1);
             char* path_in = (char*) list_get(datos, 2);
 
             char* path_dup = strndup(path_in, len);
             list_destroy_and_destroy_elements(datos, free);
+
             // Genero QID
             int qid = 0;
             pthread_mutex_lock(&mutex_qid);
@@ -157,12 +165,18 @@ void* atenderCliente(void* arg) {
             if (strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0){
                 pthread_mutex_lock(&mutex_cola_ready);
                 list_add(cola_ready, q);
+                log_debug(loggerMaster, "La cola de READY al agregar a READY esta de la siguiente forma:");
+                for (int i = 0; i < list_size(cola_ready); i++) {
+                    t_query* query_iter = list_get(cola_ready, i);
+                    log_debug(loggerMaster, "  - Query ID: %d, Prioridad actual: %d", query_iter->QCB->QID, query_iter->prioridad_actual);
+                } 
                 pthread_mutex_unlock(&mutex_cola_ready);
                 sem_post(&hay_query_ready);
             }
             else{
                 agregarAReadyPorPrioridad(q);  // esta función hacee el sem_post(&hay_query_ready) para avisar que hay una query a planificar
             }
+            iniciarAging(q);
             
 
             log_info(loggerMaster, "## Se conecta un Query Control para ejecutar la Query %s " "con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", 
@@ -212,7 +226,7 @@ void* monitorear_query_control(void* arg) {
         if (cod_op <= 0) {
             // Query Control se desconectó
             log_warning(loggerMaster, "## Se desconecta un Query Control. Se finaliza la Query %d. Motivo: DESCONEXION", qid);
-            
+            list_destroy_and_destroy_elements(data, free);
             query_control_desconectado(qid);
             break;
         }
@@ -273,22 +287,13 @@ void query_control_desconectado(int qid) {
         if (worker) {
             log_info(loggerMaster, "## Se desaloja la Query <%d> (<%d>) del Worker <%s> - Motivo: DESCONEXION",
                      qid, query->prioridad_actual, worker->id);
-            
+
             // Enviar DESALOJO al Worker
             t_paquete* p = crear_paquete();
             p->codigo_operacion = DESALOJO;
             agregar_a_paquete(p, &qid, sizeof(int));
             enviar_paquete(p, worker->fd);
             eliminar_paquete(p);
-            
-            // Marcar worker como libre (no esperar RTA_DESALOJO en este caso)
-            worker_marcar_libre_por_fd(worker->fd);
-
-            if(strcmp(configMaster->algoritmo_planificacion, "FIFO") == 0 ){
-                sem_post(&sem_workers_disponibles);
-            } else{
-                sem_post(&rePlanificar);
-            }
         }
     }
     

@@ -17,8 +17,9 @@ typedef struct {
 // Config del Kernel Global
 extern t_config_master* configMaster;
 extern t_log* loggerMaster;
+extern bool hayAging;
 
-void iniciar_config();
+void iniciar_config(char*);
 void liberar_config();
 
 #endif /* CONFIGURACION_MASTER */

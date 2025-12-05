@@ -43,7 +43,7 @@ bool esta_en_memoria(t_formato* formato, int nro_pagina) {
     return entrada->presente;
 }
 
-char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
+char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio, op_code* resultado) {
     char* buffer = calloc(1, tamanio + 1);
 
     int pagina_inicio = direccion_base / TAM_PAGINA;
@@ -68,27 +68,26 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         
         // Si la página fue desalojada por una posterior en la misma instrucción, la traemos de vuelta.
         if (entrada == NULL || !entrada->presente || entrada->indice_frame == -1) {
-            log_warning(loggerWorker, "Page Fault dentro de READ (Thrashing): Recuperando Página %d", p);
+            log_warning(loggerWorker, "Page Fault dentro de READ: Se recuperando Página %d", p);
             
             // Llamamos a la función de carga (que ya tiene mutex y todo)
-            if (!pedir_pagina_a_storage(formato, p)) {
-                log_error(loggerWorker, "Error fatal recuperando página %d en lectura.", p);
+            *resultado = pedir_pagina_a_storage(formato, p);
+            if (*resultado != OP_SUCCESS) {
+                log_error(loggerWorker, "Error recuperando página %d en lectura.", p);
                 free(clave_pag);
                 free(buffer);
-                return NULL; // O manejar error
+                return NULL;
             }
             
             // Refrescamos la entrada porque el puntero viejo pudo cambiar o invalidarse
             entrada = dictionary_get(tabla->paginas, clave_pag);
         }
-        // ----------------------------------------
 
         free(clave_pag);
 
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
 
-        // Actualizamos política
         entrada->uso = true;
         frames[frame].uso = true;
         frames[frame].timestamp = obtener_timestamp(); 
@@ -100,62 +99,94 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio) {
         
         memcpy(buffer + posicion_buffer, MEMORIA + dir_fisica, bytes_a_usar);
 
-        log_info(loggerWorker, "Query %d: Acción: LEER - Dirección Física: %d - Valor: %s", 
-            query_actual->query_id, dir_fisica, buffer + posicion_buffer);
+        log_info(loggerWorker, "Query %d: Acción: LEER - Dirección Física: %d - Valor: %.*s", 
+            query_actual->query_id, dir_fisica, bytes_a_usar, buffer + posicion_buffer);
 
         bytes_restantes -= bytes_a_usar;
         posicion_buffer += bytes_a_usar;
         offset = 0;
     }
-
+    *resultado = OP_SUCCESS;
     return buffer;  
 }
 
-void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
-    int tamanio_valor = strlen(valor);
-    int pagina_inicio = direccion_base / TAM_PAGINA;
-    int pagina_fin = (direccion_base + tamanio_valor - 1) / TAM_PAGINA;
-    int offset = direccion_base % TAM_PAGINA;
-    int bytes_restantes = tamanio_valor;
-    int posicion_valor = 0;
-
+void escribir_en_memoria(t_formato* formato, int nro_pagina, int offset, char* origen, int bytes_a_usar) {
+    
     char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
     free(clave_tabla);
 
-    for (int p = pagina_inicio; p <= pagina_fin; p++) { 
-        char* clave_pag  = string_itoa(p);
-        entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
-        free(clave_pag);
+    char* clave_pag  = string_itoa(nro_pagina);
+    entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
+    free(clave_pag);
 
-        if (entrada == NULL) {
-            log_warning(loggerWorker, "Intento de escritura en pagina %d no cargada", p);
-            break;
-        }
-
-        int frame = entrada->indice_frame;
-        int dir_fisica = frame * TAM_PAGINA + offset;
-
-        // Calculamos cuánto escribir en esta página
-        int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
-
-        usleep(configWorker->retardo_memoria * 1000);
-        // Si la página es nueva, pedir_pagina_a_storage ya debió traerla limpia o con datos.
-        memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
-
-        log_info(loggerWorker, "Query %d: Acción: ESCRIBIR - Dirección Física: %d - Valor: %s", 
-                 query_actual->query_id, dir_fisica, valor + posicion_valor);
-
-        entrada->modificado = true; 
-        frames[frame].modificado = true; 
-        entrada->uso = true; 
-        frames[frame].uso = true;
-
-        bytes_restantes -= bytes_a_usar;
-        posicion_valor += bytes_a_usar;
-        offset = 0; // Para las siguientes páginas, el offset siempre arranca en 0
+    if (entrada == NULL) {
+        log_warning(loggerWorker, "Intento de escritura en pagina %d no cargada", nro_pagina);
+        return;
     }
+
+    int frame = entrada->indice_frame;
+    int dir_fisica = frame * TAM_PAGINA + offset;
+
+    usleep(configWorker->retardo_memoria * 1000);
+    // Si la página es nueva, entonces fue a pedir_pagina_a_storage, por lo que ya debió traerla limpia o con datos.
+    memcpy(MEMORIA + dir_fisica, origen, bytes_a_usar);
+
+    log_info(loggerWorker, "Query %d: Acción: ESCRIBIR - Dirección Física: %d - Valor: %.*s", 
+                query_actual->query_id, dir_fisica, bytes_a_usar, origen);
+
+    entrada->modificado = true; 
+    frames[frame].modificado = true; 
+    entrada->uso = true; 
+    frames[frame].uso = true;
+    frames[frame].timestamp = obtener_timestamp();
 }
+
+// void escribir_en_memoria(t_formato* formato, int direccion_base, char* valor) {
+//     int tamanio_valor = strlen(valor);
+//     int pagina_inicio = direccion_base / TAM_PAGINA;
+//     int pagina_fin = (direccion_base + tamanio_valor - 1) / TAM_PAGINA;
+//     int offset = direccion_base % TAM_PAGINA;
+//     int bytes_restantes = tamanio_valor;
+//     int posicion_valor = 0;
+
+//     char* clave_tabla = string_from_format("%s:%s", formato->file_name, formato->tag);
+//     tabla_pag* tabla  = dictionary_get(diccionario_tablas, clave_tabla);
+//     free(clave_tabla);
+
+//     for (int p = pagina_inicio; p <= pagina_fin; p++) { 
+//         char* clave_pag  = string_itoa(p);
+//         entrada_pag* entrada = dictionary_get(tabla->paginas, clave_pag);
+//         free(clave_pag);
+
+//         if (entrada == NULL) {
+//             log_warning(loggerWorker, "Intento de escritura en pagina %d no cargada", p);
+//             break;
+//         }
+
+//         int frame = entrada->indice_frame;
+//         int dir_fisica = frame * TAM_PAGINA + offset;
+
+//         // Calculamos cuánto escribir en esta página
+//         int bytes_a_usar = (bytes_restantes < TAM_PAGINA - offset) ? bytes_restantes : TAM_PAGINA - offset;
+
+//         usleep(configWorker->retardo_memoria * 1000);
+//         // Si la página es nueva, pedir_pagina_a_storage ya debió traerla limpia o con datos.
+//         memcpy(MEMORIA + dir_fisica, valor + posicion_valor, bytes_a_usar);
+
+//         log_info(loggerWorker, "Query %d: Acción: ESCRIBIR - Dirección Física: %d - Valor: %.*s", 
+//                  query_actual->query_id, dir_fisica, bytes_a_usar, valor + posicion_valor);
+
+//         entrada->modificado = true; 
+//         frames[frame].modificado = true; 
+//         entrada->uso = true; 
+//         frames[frame].uso = true;
+
+//         bytes_restantes -= bytes_a_usar;
+//         posicion_valor += bytes_a_usar;
+//         offset = 0; // Para las siguientes páginas, el offset siempre arranca en 0
+//     }
+// }
 
 int obtener_timestamp() {
     struct timeval tv;
@@ -193,7 +224,7 @@ int elegir_victima_LRU() {
 
     for (int i = 1; i < CANTIDAD_MARCOS; i++) { // no se si tiene que ser < o <=
         if (frames[i].timestamp < frames[victima].timestamp) {
-            frames[i].timestamp = obtener_timestamp();
+            //frames[i].timestamp = obtener_timestamp();
             victima = i;
         }
     }
@@ -203,44 +234,78 @@ int elegir_victima_LRU() {
 }
 
 int elegir_victima_CLOCKM() {
-    int vueltas = 0;
-    int inicio = puntero_clock; // arranca en cero
-
+    // No reseteamos el puntero_clock, sigue desde donde quedó la última vez
+    int inicio = puntero_clock; 
+    
+    // PASO 1: Buscar (0,0).
     while (1) {
-        frame* frame = &frames[puntero_clock];
-
-        // Caso 1: uso=0, modificado=0
-        if (frame->ocupado && !frame->uso && !frame->modificado) { // no hace falta chequear ocupado
+        frame* f = &frames[puntero_clock];
+        if (!f->uso && !f->modificado) {
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 1 - U=0, M=0): marco %d", puntero_clock);
             int victima = puntero_clock;
             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
-            log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=0): marco %d", victima);
             return victima;
         }
-
-        // Caso 2: uso=0, modificado=1
-        if (vueltas > 0 && frame->ocupado && !frame->uso && frame->modificado) {
-            int victima = puntero_clock;
-            puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
-            log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=1): marco %d", victima);
-            return victima;
-        }
-
-        // Si uso=1 → lo pongo en 0
-        if (frame->uso) {
-            frame->uso = false;
-        }
-
-        // avanzo el puntero
+        
+        // Avanzar sin modificar nada
         puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
-
-        // ya di una vuelta completa
-        if (puntero_clock == inicio) {
-            vueltas++;
-        }
+        if (puntero_clock == inicio) break; // Termino vuelta 1
     }
+
+    // PASO 2: Buscar (0,1). Modifico bit de uso (U=0).
+    while (1) {
+        frame* f = &frames[puntero_clock];
+        
+        if (!f->uso && f->modificado) {
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 2 - U=0, M=1): marco %d", puntero_clock);
+            int victima = puntero_clock;
+            puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+            return victima;
+        }
+
+        // Si tenía uso=1, lo bajo a 0.
+        if (f->uso) {
+            f->uso = false;
+        }
+
+        puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+        if (puntero_clock == inicio) break; // Termino vuelta 2
+    }
+
+    // PASO 3: Repetir Paso 1 (Buscar 0,0).
+    while (1) {
+        frame* f = &frames[puntero_clock];
+        if (!f->uso && !f->modificado) {
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 3 - U=0, M=0): marco %d", puntero_clock);
+            int victima = puntero_clock;
+            puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+            return victima;
+        }
+        
+        puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+        if (puntero_clock == inicio) break; // Termino vuelta 3
+    }
+
+    // PASO 4: Repetir Paso 2 (Buscar 0,1).
+    while (1) {
+        frame* f = &frames[puntero_clock];
+        if (!f->uso && f->modificado) {
+            log_debug(loggerWorker, "Victima CLOCK-M (Paso 4 - U=0, M=1): marco %d", puntero_clock);
+            int victima = puntero_clock;
+            puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+            return victima;
+        }
+
+        // Avanzar por si acaso (aunque debería haber retornado antes)
+        puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
+        if (puntero_clock == inicio) break; 
+    }
+
+    log_error(loggerWorker, "Clock-M no encontro victima!");
+    return 0; 
 }
 
-bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
+op_code pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     pthread_mutex_lock(&mutex_memoria);
 
     // 1. Obtener/Crear Tabla
@@ -335,11 +400,15 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
     op_code op = recibir_operacion(conexionStorage);
 
     if (op != OP_SUCCESS) {
-        log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d (Posible Out of Bounds)", nro_bloque);
+        if(op == ERROR_OUT_OF_BOUNDS) {
+            log_warning(loggerWorker, "Storage devolvió ERROR_OUT_OF_BOUNDS al pedir bloque %d", nro_bloque);
+        } else {
+            log_warning(loggerWorker, "Storage devolvió error al pedir bloque %d", nro_bloque);
+        }
         t_list* basura = recibir_paquete(conexionStorage);
         list_destroy_and_destroy_elements(basura, free);
         pthread_mutex_unlock(&mutex_memoria);
-        return false;
+        return op;
     }
 
     t_list* lista = recibir_paquete(conexionStorage);
@@ -387,5 +456,5 @@ bool pedir_pagina_a_storage(t_formato* formato, int nro_pagina) {
              query_actual->query_id, marco, nro_pagina, formato->file_name, formato->tag);
 
     pthread_mutex_unlock(&mutex_memoria);
-    return true;
+    return OP_SUCCESS;
 }

@@ -24,6 +24,11 @@ void planificarConDesalojoYAging() {
     sem_wait(&rePlanificar);
     log_debug(loggerMaster, "Planificador con desalojo activado");
 
+    if(workers_conectados() == 0) {
+        log_debug(loggerMaster, "No hay workers conectados, se omite planificación");
+        continue;
+    }
+
     pthread_mutex_lock(&mutex_cola_ready);
     t_query* query = list_is_empty(cola_ready) ? NULL : list_get(cola_ready, 0);
     pthread_mutex_unlock(&mutex_cola_ready);
@@ -31,7 +36,9 @@ void planificarConDesalojoYAging() {
     if (query == NULL) continue;
 
     t_conexionWorker* workerLibre = obtenerWorkerLibre();
+
     if (workerLibre != NULL) {
+        query->idTemporizador = -1;
         pthread_mutex_lock(&mutex_cola_ready);
         list_remove_element(cola_ready, query);
         pthread_mutex_unlock(&mutex_cola_ready);
@@ -47,37 +54,40 @@ void planificarConDesalojoYAging() {
 
     // No hay worker libre: buscar víctima
     t_query* candidatoDesalojo = buscarQueryConMenorPrioridad();
-    if (candidatoDesalojo == NULL) {
-        // reintento: tal vez entró un worker justo ahora
-        workerLibre = obtenerWorkerLibre();
-        if (workerLibre != NULL) {
-            pthread_mutex_lock(&mutex_cola_ready);
-            list_remove_element(cola_ready, query);
-            pthread_mutex_unlock(&mutex_cola_ready);
 
-            pthread_mutex_lock(&mutex_cola_exec);
-            list_add(cola_exec, query);
-            pthread_mutex_unlock(&mutex_cola_exec);
+    //? Me parece innecessario
+    // if (candidatoDesalojo == NULL) {
+    //     reintento: tal vez entró un worker justo ahora
+    //     workerLibre = obtenerWorkerLibre();
+    //     if (workerLibre != NULL) {
+    //         pthread_mutex_lock(&mutex_cola_ready);
+    //         list_remove_element(cola_ready, query);
+    //         pthread_mutex_unlock(&mutex_cola_ready);
 
-            actualizarMetricas(Q_READY, Q_EXEC, query);
-            enviarQueryAWorkerEspecifico(query, workerLibre);
-        } else {
-            log_error(loggerMaster, "No hay queries en EXEC ni Workers libres");
-        }
-        continue;
-    }
+    //         pthread_mutex_lock(&mutex_cola_exec);
+    //         list_add(cola_exec, query);
+    //         pthread_mutex_unlock(&mutex_cola_exec);
 
-    int prioridadVictima = candidatoDesalojo ->prioridad_actual; // devuelve prioridad_actual (int)
+    //         actualizarMetricas(Q_READY, Q_EXEC, query);
+    //         enviarQueryAWorkerEspecifico(query, workerLibre);
+    //     } else {
+    //          log_error(loggerMaster, "No hay queries en EXEC ni Workers libres");
+    //     }
+    //     continue;
+    // }
+
+    int prioridadVictima = candidatoDesalojo->prioridad_actual; // devuelve prioridad_actual (int)
     log_debug(loggerMaster,"Comparo para desalojar: NUEVA QID=%d (p=%d) vs VICTIMA QID=%d (p=%d)",query->QCB->QID, query->prioridad_actual, candidatoDesalojo->QCB->QID, prioridadVictima);
 
     // Prioridad más BAJA es MEJOR. Desalojar si la nueva es mejor que la víctima.
     if (query->prioridad_actual < prioridadVictima) {
+        query->idTemporizador = -1;
         log_debug(loggerMaster, "Desalojo por prioridad");
         realizarDesalojo(candidatoDesalojo, query);
     }  else {
-    // La nueva query no tiene mayor prioridad, queda en ready
-    log_debug(loggerMaster, "Query %d (p=%d) no desaloja a %d (p=%d), se queda en READY", query->QCB->QID, query->prioridad_actual, candidatoDesalojo->QCB->QID, prioridadVictima);
-}
+        // La nueva query no tiene mayor prioridad, queda en ready
+        log_debug(loggerMaster, "Query %d (p=%d) no desaloja a %d (p=%d), se queda en READY", query->QCB->QID, query->prioridad_actual, candidatoDesalojo->QCB->QID, prioridadVictima);
+    }
 
   }
 }
@@ -87,9 +97,15 @@ void planificarSinDesalojo() {
     sem_wait(&sem_workers_disponibles); 
 
     // Saco la primer query de la cola de READY
-    pthread_mutex_lock(&mutex_cola_ready); 
-    t_query* query = list_remove(cola_ready, 0); 
+    pthread_mutex_lock(&mutex_cola_ready);
+    log_debug(loggerMaster, "La cola de READY al planificar esta de la siguiente forma:");
+    for (int i = 0; i < list_size(cola_ready); i++) {
+        t_query* query_iter = list_get(cola_ready, i);
+        log_debug(loggerMaster, "  - Query ID: %d, Prioridad actual: %d", query_iter->QCB->QID, query_iter->prioridad_actual);
+    } 
+    t_query* query = list_remove(cola_ready, 0);
     pthread_mutex_unlock(&mutex_cola_ready); 
+    query->idTemporizador = -1; 
 
     pthread_mutex_lock(&mutex_cola_exec); 
     list_add(cola_exec, query); 
@@ -122,7 +138,9 @@ void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWork
     pthread_mutex_lock(&mutex_workers);
     conexionWorker->qid_actual = query->QCB->QID;
     pthread_mutex_unlock(&mutex_workers);
+
     log_info(loggerMaster, "## Se envía la Query <%d> (<%d>) al worker <%s>", query->QCB->QID, query->prioridad_actual, conexionWorker->id);
+
     enviarQCB(conexionWorker->fd, query->QCB, query->path); 
     sem_post(&conexionWorker->esperarQuery);
 }
@@ -144,8 +162,12 @@ t_query* buscarQueryConMenorPrioridad() {
 
     pthread_mutex_lock(&mutex_cola_exec);
     int n = list_size(cola_exec);
+
+    log_debug(loggerMaster, "Buscando víctima entre %d queries en EXEC", n);
+
     for (int i = 0; i < n; i++) {
         t_query* q = list_get(cola_exec, i);
+
         if (victima == NULL || q->prioridad_actual > victima->prioridad_actual) {
             victima = q;
         } else if (victima && q->prioridad_actual == victima->prioridad_actual) {
@@ -169,20 +191,22 @@ void realizarDesalojo(t_query* candidatoDesalojo, t_query* nuevoQuery) {
 
     // 3) Buscar el worker que está ejecutando la víctima
     datos->worker = encontrarWorkerPorQid(candidatoDesalojo->QCB->QID);
+
+    log_debug(loggerMaster, "Worker encontrado para desalojo: %s", datos->worker ? datos->worker->id : "Ninguno");
+
     if (datos->worker == NULL) {
         log_error(loggerMaster, "No se encontró el Worker para la QID=%d", candidatoDesalojo->QCB->QID);
         free(datos);
         return;
     }
+    
     log_info(loggerMaster, "## Se desaloja la Query %d (p=%d) del Worker %s (fd=%d) - Motivo: PRIORIDAD",
     candidatoDesalojo->QCB->QID,
     candidatoDesalojo->prioridad_actual,
     datos->worker->id,
     datos->worker->fd);
-    // 4) Lanzar hilo que hace el desalojo
-    pthread_t hiloDesalojo;
-    pthread_create(&hiloDesalojo, NULL, desalojar, (void*) datos);
-    pthread_detach(hiloDesalojo);
+
+    desalojar((void*) datos);
 }
 
 void* desalojar(void* arg) {
@@ -195,10 +219,15 @@ void* desalojar(void* arg) {
     enviar_paquete(p, d->worker->fd);
     eliminar_paquete(p);
 
-   // 2) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
+    // 2) esperamos la respuesta (mandamos el post desde el hilo que atiende al worker)
     sem_wait(&d->worker->semaforo);
-   // 3) Movemos las queries entre colas
 
+    if(!d->worker->conectado) { // Validamos que no se haya desconectado durante el desalojo.
+        log_error(loggerMaster, "Desalojo abortado: Worker %s desconectado", d->worker->id);
+        return NULL;
+    }
+
+   // 3) Movemos las queries entre colas
     pthread_mutex_lock(&mutex_cola_exec);
     list_remove_element(cola_exec, d->candidatoDesalojo);
     list_add(cola_exec, d->nuevoQuery);
@@ -209,6 +238,9 @@ void* desalojar(void* arg) {
     agregarAReadyPorPrioridad(d->candidatoDesalojo);
     pthread_mutex_unlock(&mutex_cola_ready);
 
+    d->candidatoDesalojo->idTemporizador = -1;
+    d->nuevoQuery->idTemporizador = -1;
+    iniciarAging(d->candidatoDesalojo);
     actualizarMetricas(Q_EXEC, Q_READY, d->candidatoDesalojo);
     actualizarMetricas(Q_READY, Q_EXEC, d->nuevoQuery);
     
