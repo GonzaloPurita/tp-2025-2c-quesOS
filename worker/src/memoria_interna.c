@@ -233,44 +233,6 @@ int elegir_victima_LRU() {
     return victima;
 }
 
-// int elegir_victima_CLOCKM() {
-//     int vueltas = 0;
-//     int inicio = puntero_clock; // arranca en cero
-
-//     while (1) {
-//         frame* frame = &frames[puntero_clock];
-
-//         // Caso 1: uso=0, modificado=0
-//         if (frame->ocupado && !frame->uso && !frame->modificado) { // no hace falta chequear ocupado
-//             int victima = puntero_clock;
-//             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
-//             log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=0): marco %d", victima);
-//             return victima;
-//         }
-
-//         // Caso 2: uso=0, modificado=1
-//         if (vueltas > 0 && frame->ocupado && !frame->uso && frame->modificado) {
-//             int victima = puntero_clock;
-//             puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
-//             log_debug(loggerWorker, "Victima CLOCK-M seleccionada (uso=0,mod=1): marco %d", victima);
-//             return victima;
-//         }
-
-//         // Si uso=1 → lo pongo en 0
-//         if (frame->uso) {
-//             frame->uso = false;
-//         }
-
-//         // avanzo el puntero
-//         puntero_clock = (puntero_clock + 1) % CANTIDAD_MARCOS;
-
-//         // ya di una vuelta completa
-//         if (puntero_clock == inicio) {
-//             vueltas++;
-//         }
-//     }
-// }
-
 int elegir_victima_CLOCKM() {
     // No reseteamos el puntero_clock, sigue desde donde quedó la última vez
     int inicio = puntero_clock; 

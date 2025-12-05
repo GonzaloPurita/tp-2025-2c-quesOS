@@ -337,9 +337,12 @@ void ejecutar_create(t_instruccion* inst){ //CREATE <NOMBRE_FILE>:<TAG> ej: CREA
     agregar_a_paquete(paquete, formato->file_name, strlen(formato->file_name) + 1);
     agregar_a_paquete(paquete, formato->tag, strlen(formato->tag) + 1);
     enviar_paquete(paquete, conexionStorage);
+    log_debug(loggerWorker, "EL paquete de %d contiene: %s %s", query_actual->query_id, formato->file_name, formato->tag);
     eliminar_paquete(paquete);
 
+    log_debug(loggerWorker, "Estoy afuera");
     op_code rta = recibir_operacion(conexionStorage);
+    log_debug(loggerWorker, "Estoy adentro");
     t_list* rtaP = recibir_paquete(conexionStorage);
     manejar_respuesta_storage(rta, "CREATE");
 
@@ -779,13 +782,28 @@ void guardar_paginas_modificadas() {
         t_pagina_a_guardar* p = list_get(paginas, i);
 
         t_paquete* paquete = crear_paquete();
+        paquete->codigo_operacion = OP_WRITE; 
+        agregar_a_paquete(paquete, &query_actual->query_id, sizeof(int));
         agregar_a_paquete(paquete, p->file, strlen(p->file) + 1);
         agregar_a_paquete(paquete, p->tag, strlen(p->tag) + 1);
         agregar_a_paquete(paquete, &p->page_num, sizeof(int));
         agregar_a_paquete(paquete, p->contenido, TAM_PAGINA);
+        int tam_pag = TAM_PAGINA;
+        agregar_a_paquete(paquete, &tam_pag, sizeof(int));
 
         enviar_paquete(paquete, conexionStorage);
         eliminar_paquete(paquete);
+
+        op_code rta = recibir_operacion(conexionStorage);
+        t_list* rtaList = recibir_paquete(conexionStorage);
+        if (rtaList) list_destroy_and_destroy_elements(rtaList, free);
+        
+        if (rta != OP_SUCCESS) {
+            log_error(loggerWorker, "Error al guardar página %d de %s:%s en desalojo. Cod: %d", 
+                      p->page_num, p->file, p->tag, rta);
+        } else {
+            log_debug(loggerWorker, "Página %d guardada correctamente", p->page_num);
+        }
 
         pthread_mutex_lock(&mutex_memoria);
         frames[p->index_frame].modificado = false;
