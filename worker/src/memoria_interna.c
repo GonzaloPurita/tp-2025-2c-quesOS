@@ -68,7 +68,7 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio, op
         
         // Si la página fue desalojada por una posterior en la misma instrucción, la traemos de vuelta.
         if (entrada == NULL || !entrada->presente || entrada->indice_frame == -1) {
-            log_warning(loggerWorker, "Page Fault dentro de READ (Thrashing): Recuperando Página %d", p);
+            log_warning(loggerWorker, "Page Fault dentro de READ: Se recuperando Página %d", p);
             
             // Llamamos a la función de carga (que ya tiene mutex y todo)
             *resultado = pedir_pagina_a_storage(formato, p);
@@ -76,20 +76,18 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio, op
                 log_error(loggerWorker, "Error recuperando página %d en lectura.", p);
                 free(clave_pag);
                 free(buffer);
-                return NULL; // O manejar error
+                return NULL;
             }
             
             // Refrescamos la entrada porque el puntero viejo pudo cambiar o invalidarse
             entrada = dictionary_get(tabla->paginas, clave_pag);
         }
-        // ----------------------------------------
 
         free(clave_pag);
 
         int frame = entrada->indice_frame;
         int dir_fisica = frame * TAM_PAGINA + offset;
 
-        // Actualizamos política
         entrada->uso = true;
         frames[frame].uso = true;
         frames[frame].timestamp = obtener_timestamp(); 
@@ -111,28 +109,6 @@ char* leer_desde_memoria(t_formato* formato, int direccion_base, int tamanio, op
     *resultado = OP_SUCCESS;
     return buffer;  
 }
-
-
-// void escribir_fragmento_en_memoria(t_formato* f, int nro_pag, int offset, char* origen, int cant) {
-//     char* k = string_from_format("%s:%s", f->file_name, f->tag);
-//     tabla_pag* t = dictionary_get(diccionario_tablas, k);
-//     char* kp = string_itoa(nro_pag);
-//     entrada_pag* e = dictionary_get(t->paginas, kp);
-    
-//     int frame = e->indice_frame;
-//     int dir_fisica = (frame * TAM_PAGINA) + offset;
-
-//     usleep(configWorker->retardo_memoria * 1000);
-//     memcpy(MEMORIA + dir_fisica, origen, cant);
-
-//     e->uso = true;
-//     e->modificado = true
-//     frames[frame].uso = true;
-//     frames[frame].modificado = true; 
-//     frames[frame].timestamp = obtener_timestamp();
-
-//     free(k); free(kp);
-// }
 
 void escribir_en_memoria(t_formato* formato, int nro_pagina, int offset, char* origen, int bytes_a_usar) {
     

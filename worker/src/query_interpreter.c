@@ -70,6 +70,7 @@ void recibir_queries() {
             interrupt_flag = true;
             pthread_mutex_unlock(&mutex_interrupt);
             log_info(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
+            log_error(loggerWorker, "## Query %d: Desalojada por pedido del Master", query_actual->query_id);
         }
         else {
             log_error(loggerWorker, "Operación inesperada del Master: %d", cod_op);
@@ -450,7 +451,7 @@ void ejecutar_commit(t_instruccion* inst){ // COMMIT <NOMBRE_FILE>:<TAG> ej: COM
     if (tabla != NULL) {
         flush_paginas_modificadas_de_tabla(tabla, formato);
     } else {
-        log_warning(loggerWorker, "No existe tabla de páginas para %s:%s — no hay nada que commitear", formato->file_name, formato->tag);
+        log_warning(loggerWorker, "No existe tabla de páginas para %s:%s — no hay páginas para flushear", formato->file_name, formato->tag);
     }
 
     free(clave_tabla);
@@ -503,7 +504,7 @@ void ejecutar_end(t_instruccion* inst){
 
 
  // READ <NOMBRE_FILE>:<TAG> <DIRECCION_BASE> <TAMAÑO>  ej: READ MATERIAS:BASE 0 8
-void ejecutar_read(t_instruccion* inst) { 
+ void ejecutar_read(t_instruccion* inst) { 
     char* recurso = inst->parametros[0];
     int direccion_base = atoi(inst->parametros[1]);
     int tamanio = atoi(inst->parametros[2]);
@@ -522,10 +523,17 @@ void ejecutar_read(t_instruccion* inst) {
             // Ya no logueamos MISS aquí porque lo hace pedir_pagina_a_storage
             
             // Verificamos si la carga fue exitosa
-            if (!pedir_pagina_a_storage(formato, *nro_pagina)) {
+            op_code resultado_pedido = pedir_pagina_a_storage(formato, *nro_pagina);
+            
+            if (resultado_pedido != OP_SUCCESS) {
                 log_error(loggerWorker, "No se pudo cargar la página %d. Abortando READ.", *nro_pagina);
                 error_carga = true;
                 
+                char* motivo = "Error desconocido en carga";
+                if (resultado_pedido == ERROR_OUT_OF_BOUNDS) motivo = "Lectura fuera de los limites";
+                
+                notificar_error_a_master(motivo);
+
                 // Levantamos la bandera para detener el script
                 pthread_mutex_lock(&mutex_error);
                 query_error_flag = true;
@@ -585,45 +593,6 @@ void ejecutar_read(t_instruccion* inst) {
     destruir_formato(formato);
 }
 
-// void ejecutar_write(t_instruccion* inst){   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
-//     char* recurso = inst->parametros[0];       
-    
-//     t_formato* formato = mapear_formato(recurso);
-//     int direccion_base = atoi(inst->parametros[1]);
-//     char* valor  = inst->parametros[2];
-//     int tamanio_valor = strlen(valor); //lo que ocupa el string
-
-//     // calculo las paginas necesarias
-//     t_list* paginas = paginas_necesarias(direccion_base, tamanio_valor);
-
-//     log_debug(loggerWorker, "WRITE necesita %d páginas para %s:%s desde base %d tamaño %d", list_size(paginas), formato->file_name, formato->tag, direccion_base, tamanio_valor);
-
-//     // para cada página, verificamos si esta en memoria
-//     for (int i = 0; i < list_size(paginas); i++) { 
-//         int* nro_pagina = list_get(paginas, i);
-//         bool en_memoria = esta_en_memoria(formato, *nro_pagina);
-
-//         if (!en_memoria) {
-//             log_info(loggerWorker, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d", query_actual->query_id, formato->file_name, formato->tag, *nro_pagina);
-//             pedir_pagina_a_storage(formato, *nro_pagina);
-//         }
-//     }
-
-//     escribir_en_memoria(formato, direccion_base, valor);
-
-//     // informo al Master que se hizo el WRITE
-//     t_paquete* respuesta = crear_paquete();
-//     respuesta->codigo_operacion = OP_WRITE;
-//     agregar_a_paquete(respuesta, valor, strlen(valor) + 1);
-//     enviar_paquete(respuesta, conexionMaster);
-//     eliminar_paquete(respuesta);
-
-//     log_info(loggerWorker, "## Query %d: - Instrucción realizada: WRITE %s:%s base=%d valor=%s", query_actual->query_id, formato->file_name, formato->tag, direccion_base, valor);
-
-//     list_destroy_and_destroy_elements(paginas, free);
-//     destruir_formato(formato);
-// }
-
 void ejecutar_write(t_instruccion* inst) {   //ej: WRITE MATERIAS:V2 0 SISTEMAS_OPERATIVOS_2
     char* recurso = inst->parametros[0];       
     
@@ -680,7 +649,8 @@ void ejecutar_write(t_instruccion* inst) {   //ej: WRITE MATERIAS:V2 0 SISTEMAS_
     destruir_formato(formato);
 }
 
-void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
+// FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH <NOMBRE_FILE>:<TAG>
+void ejecutar_flush(t_instruccion* inst){ 
     char* recurso = inst->parametros[0];
     t_formato* formato = mapear_formato(recurso);
 
@@ -694,8 +664,10 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
         destruir_formato(formato);
         return;
     }else {
-        flush_paginas_modificadas_de_tabla(tabla, formato);
-        log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+        bool exito = flush_paginas_modificadas_de_tabla(tabla, formato);
+        if(exito) {
+            log_info(loggerWorker, "## Query %d: - Instrucción realizada: FLUSH %s:%s", query_actual->query_id, formato->file_name, formato->tag);
+        }
     }
     
     free(clave_tabla);
@@ -703,13 +675,16 @@ void ejecutar_flush(t_instruccion* inst){ // FLUSH <NOMBRE_FILE>:<TAG> ej: FLUSH
 }
 
 // envia todas las pags modificadas de la tabla 'tabla' para el file:tag 'formato'.
-void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
+bool flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
 
-    if (!tabla || !formato) return;
+    if (!tabla || !formato) return true;
 
     t_list* keys = dictionary_keys(tabla->paginas);
+    bool todo_ok = true;
 
     for (int i = 0; i < list_size(keys); i++) {
+
+        if (!todo_ok) break;
 
         char* key = list_get(keys, i);
         entrada_pag* entrada = dictionary_get(tabla->paginas, key);
@@ -748,11 +723,14 @@ void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato) {
         t_list* rtaList = recibir_paquete(conexionStorage);
         if (rtaList) list_destroy_and_destroy_elements(rtaList, free);
 
-        if (rta != OP_SUCCESS)
+        if (rta != OP_SUCCESS) {
             manejar_respuesta_storage(rta, "FLUSH");
+            todo_ok = false;
+        }
     }
 
     list_destroy(keys);
+    return todo_ok;
 }
 
 void guardar_paginas_modificadas() {
@@ -810,7 +788,7 @@ void manejar_respuesta_storage(op_code respuesta, char* operacion) {
 
     switch (respuesta) {
         case OP_SUCCESS:
-            log_debug(loggerWorker, "[Storage] %s -> SUCCESS", operacion);
+            log_debug(loggerWorker, "%s -> SUCCESS", operacion);
             return;
         case ERROR_FILE_NOT_FOUND:
             motivo_error = "File no encontrado";

@@ -69,7 +69,7 @@ void destruir_instruccion(t_instruccion* inst);
 t_formato* mapear_formato(char* recurso);
 void destruir_formato(t_formato* formato);
 void destruir_query_context(t_query_context* ctx);
-void flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato);
+bool flush_paginas_modificadas_de_tabla(tabla_pag* tabla, t_formato* formato);
 void manejar_respuesta_storage(op_code respuesta, char* operacion);
 void notificar_error_a_master(char* motivo);
 void* correr_query_en_hilo(void* arg);
