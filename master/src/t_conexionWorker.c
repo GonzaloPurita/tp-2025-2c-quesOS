@@ -240,10 +240,11 @@ void* atenderWorker(void* arg){
     }
       
       int codigoOperacion = recibir_operacion(fd); // Recibo la operacion del worker
-      if(codigoOperacion <= 0){
-        worker_desconectar_por_fd(fd);
-        break;
-      }  
+      
+    //   if(codigoOperacion <= 0){
+    //     worker_desconectar_por_fd(fd);
+    //     break;
+    //   }  
         
       switch (codigoOperacion) {
             case RTA_DESALOJO: {
@@ -507,7 +508,15 @@ void* atenderWorker(void* arg){
         case -1: { 
             log_error(loggerMaster, "Worker %s: conexión perdida", id);
             conexionWorker->conectado = false;
+
+            pthread_mutex_lock(&mutex_workers);
+            list_remove_element(LISTA_WORKERS, conexionWorker);
+            pthread_mutex_unlock(&mutex_workers);
+
             sem_post(&conexionWorker->semaforo); // -> Podría desconectarse durante un desalojo -> Deadlock
+
+            worker_desconectar_por_fd(fd);
+
             pthread_exit(NULL);
             break;
         }
