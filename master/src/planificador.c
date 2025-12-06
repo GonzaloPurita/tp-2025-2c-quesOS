@@ -148,6 +148,7 @@ void enviarQueryAWorkerEspecifico(t_query* query, t_conexionWorker* conexionWork
 t_conexionWorker* obtenerWorkerLibre() {
     pthread_mutex_lock(&mutex_workers);
     t_conexionWorker* w = NULL;
+    imprimir_cola(LISTA_WORKERS, "WORKER");
     for (int i = 0; i < list_size(LISTA_WORKERS); i++) {
         t_conexionWorker* it = list_get(LISTA_WORKERS, i);
         if (it->conectado && it->qid_actual == -1) { w = it; break; }
